@@ -1,0 +1,37 @@
+schema_version: 1
+checks:
+  - id: ppm.license.activated
+    title: Package Manager license is activated
+    severity: blocking
+    tags: [license, packagemanager]
+    applies_to:
+      products: [packagemanager]
+    requires_root: true
+    why: |
+      `/opt/rstudio-pm/bin/license-manager status` must report
+      "Status: Activated". Without it PPM will not serve repositories.
+    references:
+      - https://docs.posit.co/rspm/admin/getting-started/installation/installing-ppm.html#activate-license
+    primitive: cmd
+    with:
+      cmd: "/opt/rstudio-pm/bin/license-manager status"
+      expect_exit: 0
+      expect_stdout_regex: 'Status:\s+Activated'
+
+  - id: ppm.license.file-present
+    title: Package Manager license file present in /var/lib/rstudio-pm (if used)
+    severity: info
+    tags: [license, packagemanager]
+    applies_to:
+      products: [packagemanager]
+    requires_root: true
+    why: |
+      A .lic file in /var/lib/rstudio-pm overrides any license-key activation.
+      Surfaced informationally to make the licensing method explicit.
+    references:
+      - https://docs.posit.co/rspm/admin/licensing.html#licensing-with-file
+    primitive: dir
+    with:
+      path: /var/lib/rstudio-pm
+      glob: "*.lic"
+      glob_min_matches: 1

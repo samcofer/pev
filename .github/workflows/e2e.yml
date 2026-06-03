@@ -1,0 +1,85 @@
+name: e2e
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * *"   # nightly 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The container OS exercises both the Ubuntu and RHEL-family code paths.
+        # Alma 9/10 substitute for RHEL 9/10 (publicly pullable; UBI requires auth).
+        # We run as root inside the container so apt-get/dnf can fetch the minimal
+        # tools pev needs. Non-root coverage is exercised via /tmp/pev-nonroot
+        # below by su'ing to nobody after the install layer.
+        image:
+          - ubuntu:22.04
+          - ubuntu:24.04
+          - almalinux:9
+          - almalinux:10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build pev binary
+        env: { CGO_ENABLED: 0 }
+        run: go build -trimpath -ldflags "-s -w" -o pev ./
+      - name: Run pev inside ${{ matrix.image }}
+        run: |
+          set -e
+          docker run --rm \
+            -v "$PWD":/work -w /work \
+            "${{ matrix.image }}" \
+            bash -c '
+              set -e
+              if command -v apt-get >/dev/null; then
+                apt-get update -qq
+                apt-get install -yqq --no-install-recommends ca-certificates curl iproute2 procps openssl >/dev/null
+              elif command -v dnf >/dev/null; then
+                dnf -y install ca-certificates curl iproute procps-ng openssl which >/dev/null
+              fi
+
+              echo "::group::pev version"
+              ./pev version
+              echo "::endgroup::"
+
+              echo "::group::pev discover (root)"
+              ./pev discover
+              echo "::endgroup::"
+
+              echo "::group::pev assess (root, no egress)"
+              # No Posit products are installed in these clean images, so we
+              # expect blocking failures on workbench/connect/ppm presence
+              # checks. The artifact files must still be written.
+              ./pev assess --non-interactive --out-dir /tmp/pev-root --skip-tags egress || true
+              ls /tmp/pev-root/
+              test -f /tmp/pev-root/pev-report-*.md
+              test -f /tmp/pev-root/pev-report-*.json
+              test -f /tmp/pev-root/pev-cmdlog-*.sh
+              echo "::endgroup::"
+
+              echo "::group::pev assess (non-root, no egress)"
+              # Run again as a non-root user to exercise the requires_root SKIP
+              # path. Use nobody (UID 65534), which both Debian and RHEL ship.
+              mkdir -p /tmp/pev-nobody && chown -R 65534:65534 /tmp/pev-nobody
+              if command -v runuser >/dev/null; then
+                runuser -u nobody -- ./pev assess --non-interactive --out-dir /tmp/pev-nobody --skip-tags egress || true
+              else
+                su -s /bin/sh nobody -c "./pev assess --non-interactive --out-dir /tmp/pev-nobody --skip-tags egress" || true
+              fi
+              ls /tmp/pev-nobody/
+              test -f /tmp/pev-nobody/pev-report-*.md
+              # Confirm at least one requires_root SKIP appears in the JSON.
+              grep -q "requires root" /tmp/pev-nobody/pev-report-*.json
+              echo "::endgroup::"
+            '

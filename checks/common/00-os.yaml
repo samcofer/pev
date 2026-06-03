@@ -1,0 +1,33 @@
+schema_version: 1
+checks:
+  - id: os.supported
+    title: Operating system is supported by Posit professional products
+    severity: blocking
+    tags: [os]
+    applies_to:
+      os: [ubuntu-22.04, ubuntu-24.04, rhel-8, rhel-9, rhel-10]
+    why: |
+      Posit Workbench, Posit Connect, and Posit Package Manager support
+      Ubuntu 22.04, Ubuntu 24.04, and RHEL 8/9/10 (and binary-compatible
+      rebuilds: Alma Linux, Rocky Linux). Ubuntu 20.04 is end-of-support and
+      not supported by current product releases.
+    references:
+      - https://docs.posit.co/platform-support.html
+    primitive: cmd
+    with:
+      cmd: "true"
+      expect_exit: 0
+
+  - id: os.architecture.amd64-or-arm64
+    title: CPU architecture is amd64 or arm64
+    severity: blocking
+    tags: [os, arch]
+    applies_to:
+      arch: [amd64, arm64]
+    why: |
+      Posit professional products ship amd64 and arm64 Linux builds only.
+      Other architectures cannot install the official packages.
+    primitive: cmd
+    with:
+      cmd: "uname -m"
+      expect_exit: 0

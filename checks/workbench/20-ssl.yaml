@@ -1,0 +1,40 @@
+schema_version: 1
+checks:
+  - id: workbench.ssl.cert-key-match
+    title: Workbench SSL certificate and key are paired
+    severity: blocking
+    tags: [ssl, workbench]
+    applies_to:
+      products: [workbench]
+    why: |
+      A mismatched cert/key prevents rserver from serving HTTPS. pev compares
+      RSA modulus and exponent between the cert's public key and the private
+      key file rather than shelling to openssl, but the docs document an
+      equivalent openssl-based pairing check.
+    references:
+      - https://docs.posit.co/how-to-guides/guides/install-ssl-certificates.html#verify-pairing
+    primitive: x509
+    with:
+      cert_path: "{{ .Inputs.workbench_cert }}"
+      key_path: "{{ .Inputs.workbench_key }}"
+      verify_chain: true
+      match_hostname: "{{ .Inputs.workbench_hostname }}"
+      not_after_min_days: 30
+
+  - id: workbench.ssl.config
+    title: rserver.conf has ssl-enabled set
+    severity: warning
+    tags: [ssl, workbench, config]
+    applies_to:
+      products: [workbench]
+    requires_root: true
+    why: |
+      Workbench reads rserver.conf at startup. ssl-enabled=1 plus
+      ssl-certificate / ssl-certificate-key paths is the canonical config.
+    references:
+      - https://docs.posit.co/ide/server-pro/admin/access_and_security/secure_sockets.html#set-up-ssl
+    primitive: file
+    with:
+      path: /etc/rstudio/rserver.conf
+      must_exist: true
+      contains_regex: "(?m)^ssl-enabled=1"

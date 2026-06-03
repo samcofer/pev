@@ -1,0 +1,17 @@
+schema_version: 1
+checks:
+  - id: ppm.egress.sync
+    title: Package Manager can reach the Posit Package Service
+    severity: blocking
+    tags: [network, egress, packagemanager]
+    applies_to:
+      products: [packagemanager]
+    why: |
+      Without rspm-sync.rstudio.com PPM cannot sync CRAN/PyPI metadata.
+      Air-gapped environments have a separate offline workflow — flag early.
+    references:
+      - https://docs.posit.co/rspm/admin/getting-started/requirements.html#network
+    primitive: http
+    with:
+      url: https://rspm-sync.rstudio.com/
+      timeout_seconds: 10

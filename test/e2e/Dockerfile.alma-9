@@ -1,0 +1,4 @@
+FROM almalinux:9
+RUN dnf -y install ca-certificates curl iproute procps-ng openssl which \
+ && dnf clean all
+WORKDIR /work

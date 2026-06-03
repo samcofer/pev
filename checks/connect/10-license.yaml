@@ -1,0 +1,37 @@
+schema_version: 1
+checks:
+  - id: connect.license.activated
+    title: Connect license is activated
+    severity: blocking
+    tags: [license, connect]
+    applies_to:
+      products: [connect]
+    requires_root: true
+    why: |
+      `/opt/rstudio-connect/bin/license-manager status` must report
+      "Status: Activated". Without it Connect will refuse to start.
+    references:
+      - https://docs.posit.co/connect/admin/getting-started/local-install/server-install/index.html#step-2.-verify-and-activate-your-license
+    primitive: cmd
+    with:
+      cmd: "/opt/rstudio-connect/bin/license-manager status"
+      expect_exit: 0
+      expect_stdout_regex: 'Status:\s+Activated'
+
+  - id: connect.license.file-present
+    title: Connect license file present in /var/lib/rstudio-connect (if used)
+    severity: info
+    tags: [license, connect]
+    applies_to:
+      products: [connect]
+    requires_root: true
+    why: |
+      A .lic file in /var/lib/rstudio-connect overrides any license-key
+      activation. Surfaced informationally to make the licensing method explicit.
+    references:
+      - https://docs.posit.co/connect/admin/licensing/index.html#license-file
+    primitive: dir
+    with:
+      path: /var/lib/rstudio-connect
+      glob: "*.lic"
+      glob_min_matches: 1

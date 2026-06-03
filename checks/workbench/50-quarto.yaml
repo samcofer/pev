@@ -1,0 +1,19 @@
+schema_version: 1
+checks:
+  - id: workbench.quarto.present
+    title: Quarto is available to Workbench sessions
+    severity: warning
+    tags: [quarto, workbench]
+    applies_to:
+      products: [workbench]
+    why: |
+      RStudio Pro sessions ship a bundled Quarto, but VS Code, Positron, and
+      JupyterLab sessions need quarto on PATH. Posit recommends a versioned
+      install at /opt/quarto/<version>/bin/quarto with a /usr/local/bin/quarto
+      symlink for PATH visibility.
+    references:
+      - https://docs.posit.co/resources/install-quarto.html
+    primitive: cmd
+    with:
+      cmd: "command -v quarto || ls /opt/quarto/*/bin/quarto 2>/dev/null"
+      expect_exit: 0

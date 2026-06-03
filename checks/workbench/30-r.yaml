@@ -1,0 +1,20 @@
+schema_version: 1
+checks:
+  - id: workbench.r.versioned-install
+    title: At least one R install at /opt/R/<version>/bin/R
+    severity: warning
+    tags: [r, workbench]
+    applies_to:
+      products: [workbench]
+    why: |
+      Posit Workbench expects versioned R installs under /opt/R/<version> so
+      multiple R versions can coexist. Workbench's auto-scan reports findings
+      to /var/lib/rstudio-server/r-versions on startup.
+    references:
+      - https://docs.posit.co/ide/server-pro/admin/r/installing_r.html
+    primitive: dir
+    with:
+      path: /opt/R
+      must_exist: true
+      glob: "*/bin/R"
+      glob_min_matches: 1

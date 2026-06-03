@@ -1,0 +1,91 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+      - run: go vet ./...
+      - run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "Files need gofmt:"; echo "$out"; exit 1
+          fi
+
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go test ./... -race -shuffle=on -coverprofile=cover.out -covermode=atomic
+      - uses: codecov/codecov-action@v5
+        with:
+          files: cover.out
+          fail_ci_if_error: false
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+      - uses: securego/gosec@master
+        with:
+          args: -severity medium ./...
+
+  build-matrix:
+    needs: [lint, test]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [linux]
+        arch: [amd64, arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - env:
+          CGO_ENABLED: 0
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          go build -trimpath -ldflags "-s -w \
+            -X main.version=ci-${{ github.sha }} \
+            -X main.commit=${{ github.sha }} \
+            -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -o pev_${{ matrix.os }}_${{ matrix.arch }} ./
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pev-${{ matrix.os }}-${{ matrix.arch }}
+          path: pev_${{ matrix.os }}_${{ matrix.arch }}

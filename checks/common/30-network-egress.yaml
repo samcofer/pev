@@ -1,0 +1,65 @@
+schema_version: 1
+checks:
+  - id: net.egress.cdn-rstudio
+    title: Outbound HTTPS to cdn.rstudio.com reachable
+    severity: blocking
+    tags: [network, egress]
+    applies_to:
+      products: [workbench, connect, packagemanager]
+    why: |
+      Posit installers and software updates are served from cdn.rstudio.com.
+      Without this endpoint reachable, installs and patching cannot proceed.
+    references:
+      - https://docs.posit.co/getting-started/networking.html
+    primitive: http
+    with:
+      url: https://cdn.rstudio.com/
+      timeout_seconds: 5
+
+  - id: net.egress.cdn-posit
+    title: Outbound HTTPS to cdn.posit.co reachable
+    severity: blocking
+    tags: [network, egress]
+    applies_to:
+      products: [workbench, connect, packagemanager]
+    why: |
+      cdn.posit.co serves the modern installer manifests for Posit professional
+      products. Required for installs and updates.
+    references:
+      - https://docs.posit.co/getting-started/networking.html
+    primitive: http
+    with:
+      url: https://cdn.posit.co/
+      timeout_seconds: 5
+
+  - id: net.egress.license-activation
+    title: Outbound HTTPS to www.wyday.com reachable (license activation)
+    severity: warning
+    tags: [network, egress, license]
+    applies_to:
+      products: [workbench, connect, packagemanager]
+    why: |
+      Online license-key activation contacts wyDay's TurboFloat service.
+      Not required when activating with a license file (.lic), but the most
+      common surprise during install sessions when keys are used.
+    references:
+      - https://docs.posit.co/getting-started/networking.html
+    primitive: http
+    with:
+      url: https://www.wyday.com/
+      timeout_seconds: 5
+
+  - id: net.egress.packagemanager-posit
+    title: Outbound HTTPS to packagemanager.posit.co reachable
+    severity: warning
+    tags: [network, egress, packages]
+    applies_to:
+      products: [workbench, connect]
+    why: |
+      Public Package Manager fronts CRAN/PyPI for users without a private PPM.
+      Workbench and Connect resolve packages here when no internal repository is
+      configured.
+    primitive: http
+    with:
+      url: https://packagemanager.posit.co/
+      timeout_seconds: 5

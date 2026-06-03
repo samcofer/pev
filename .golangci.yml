@@ -1,0 +1,39 @@
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - gosec
+    - revive
+    - gofumpt
+    - gocyclo
+    - unused
+    - errorlint
+    - bodyclose
+    - noctx
+    - ineffassign
+    - misspell
+    - unconvert
+
+linters-settings:
+  gocyclo:
+    min-complexity: 18
+  gosec:
+    excludes:
+      # G204: Subprocess launched with variable — pev's whole job is shelling out
+      # for primitives; arguments are catalog-controlled, not user-controlled.
+      - G204
+      # G304: file inclusion via variable — same rationale; check files are user-driven by design.
+      - G304
+  revive:
+    severity: warning
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters: [gosec, gocyclo, errcheck]

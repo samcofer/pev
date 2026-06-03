@@ -1,0 +1,20 @@
+schema_version: 1
+checks:
+  - id: workbench.python.versioned-install
+    title: At least one Python install at /opt/python/<version>/bin/python3
+    severity: warning
+    tags: [python, workbench]
+    applies_to:
+      products: [workbench]
+    why: |
+      Posit's reproducibility model expects versioned Python installs under
+      /opt/python/<version>. Without them, Workbench projects pin against
+      system Python and break across upgrades.
+    references:
+      - https://docs.posit.co/resources/install-python-uv.html
+    primitive: dir
+    with:
+      path: /opt/python
+      must_exist: true
+      glob: "*/bin/python3"
+      glob_min_matches: 1

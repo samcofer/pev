@@ -1,0 +1,16 @@
+schema_version: 1
+checks:
+  - id: workbench.idp.metadata
+    title: IdP metadata or discovery URL is reachable
+    severity: warning
+    tags: [auth, workbench]
+    applies_to:
+      products: [workbench]
+    why: |
+      SAML metadata or OIDC discovery must be reachable from the Workbench
+      server during configuration; auth misconfiguration is the most common
+      single-session blocker per BCBS runbook lessons.
+    primitive: http
+    with:
+      url: "{{ .Inputs.idp_metadata_url }}"
+      timeout_seconds: 8

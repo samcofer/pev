@@ -1,0 +1,61 @@
+version: 2
+project_name: pev
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: pev
+    binary: pev
+    main: ./
+    env:
+      - CGO_ENABLED=0
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: bin-only
+    formats: [binary]
+    name_template: "pev_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "pev_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+sboms:
+  - artifacts: archive
+
+# Cosign keyless signing of the checksums file (the binaries are verified
+# transitively via the signed checksum file).
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    output: true
+    args:
+      - sign-blob
+      - "--yes"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+
+release:
+  github:
+    owner: samcofer
+    name: pev
+  draft: true
+  prerelease: auto
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"

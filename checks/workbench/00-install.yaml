@@ -1,0 +1,17 @@
+schema_version: 1
+checks:
+  - id: workbench.binary.present
+    title: rstudio-server binary is installed
+    severity: info
+    tags: [workbench, install]
+    applies_to:
+      products: [workbench]
+    why: |
+      Detects whether Workbench has been installed yet. Reported informational
+      so a fresh prereq run on an empty box still produces a clean report.
+    references:
+      - https://docs.posit.co/ide/server-pro/admin/getting_started/installation/installation.html
+    primitive: file
+    with:
+      path: /usr/lib/rstudio-server/bin/rserver
+      must_exist: true
