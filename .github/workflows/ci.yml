@@ -46,6 +46,12 @@ jobs:
           files: cover.out
           fail_ci_if_error: false
 
+  # gosec runs inside golangci-lint with the project's exclude list, so we do
+  # not run it standalone here — the standalone action reads no config and
+  # would re-flag every G204/G304/G306 we already justified for the catalog
+  # primitives. govulncheck stays as an advisory job: the Go stdlib churns
+  # CVEs and we don't want a brand-new one to block the release of an
+  # otherwise-good pev. Findings still surface in the Actions UI.
   security:
     runs-on: ubuntu-latest
     steps:
@@ -54,17 +60,11 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      # govulncheck is advisory: the Go stdlib churns CVEs frequently, and we
-      # don't want a brand-new stdlib CVE to block release of an otherwise-good
-      # pev. The job still surfaces findings in the Actions UI for triage.
       - name: govulncheck (advisory)
         continue-on-error: true
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
-      - uses: securego/gosec@master
-        with:
-          args: -severity medium ./...
 
   build-matrix:
     needs: [lint, test]

@@ -14,6 +14,7 @@ import (
 	"github.com/posit-dev/pev/internal/checks"
 	"github.com/posit-dev/pev/internal/discover"
 	"github.com/posit-dev/pev/internal/logging"
+	"github.com/posit-dev/pev/internal/prompt"
 	"github.com/posit-dev/pev/internal/report"
 )
 
@@ -34,8 +35,6 @@ func newAssessCmd() *cobra.Command {
 		skipTags       []string
 		skipChecks     []string
 		noCmdLog       bool
-		_              = yes
-		_              = nonInteractive
 	)
 	c := &cobra.Command{
 		Use:   "assess",
@@ -78,8 +77,19 @@ func newAssessCmd() *cobra.Command {
 				selected = []string{"workbench", "connect", "packagemanager"}
 			}
 
-			// Inputs map — flag-driven for v0.1; v0.2 adds survey prompts.
-			inputs := buildInputs(licenseFile, hostnames, idp, facts)
+			// Pick the prompt mode from CLI flags. --non-interactive wins
+			// over --yes; both fall through to interactive when neither
+			// is set. The interactive driver auto-downgrades to yes when
+			// stdin/stdout are not a TTY (CI, piped runs).
+			mode := prompt.ModeInteractive
+			switch {
+			case nonInteractive:
+				mode = prompt.ModeNonInteractive
+			case yes:
+				mode = prompt.ModeYes
+			}
+			driver := prompt.New(mode)
+			inputs := buildInputs(licenseFile, hostnames, idp, facts, selected, driver)
 
 			// Load catalog.
 			extraDirs := []string{}
@@ -203,29 +213,102 @@ func profileToProducts(profile string) []string {
 	return nil
 }
 
-func buildInputs(licenseFile string, hostnamePairs []string, idp string, facts discover.HostFacts) map[string]string {
+// buildInputs collects every input the catalog references: per-product
+// hostname/cert/key paths, IdP metadata URL, SMTP host, license file path.
+// Order of precedence: explicit CLI flag > prompt answer > discovered default.
+// The prompt driver decides at runtime whether to actually show a TUI prompt
+// (interactive), silently take the discovered default (yes / non-interactive),
+// or downgrade to yes when stdin is not a TTY (e.g. CI, piped runs).
+func buildInputs(
+	licenseFile string,
+	hostnamePairs []string,
+	idp string,
+	facts discover.HostFacts,
+	selected []string,
+	d prompt.Driver,
+) map[string]string {
 	in := map[string]string{}
 	if licenseFile != "" {
 		in["license_file"] = licenseFile
 	}
-	if idp != "" {
-		in["idp"] = idp
-	}
-	// Default each product hostname to the host's FQDN if known.
+
 	defaultHost := facts.FQDN
 	if defaultHost == "" {
 		defaultHost = facts.Hostname
 	}
-	for _, p := range []string{"workbench", "connect", "ppm"} {
-		in[p+"_hostname"] = defaultHost
-	}
+
+	// Per-product hostname: flag wins; otherwise use the host's FQDN as the
+	// prompt default. Customers running a multi-host install will override.
+	hostnameOverrides := map[string]string{}
 	for _, kv := range hostnamePairs {
 		k, v, ok := strings.Cut(kv, "=")
 		if !ok || v == "" {
 			continue
 		}
-		in[strings.TrimSpace(k)+"_hostname"] = strings.TrimSpace(v)
+		hostnameOverrides[strings.TrimSpace(k)] = strings.TrimSpace(v)
 	}
+
+	type productPrompt struct{ key, label, defaultCert, defaultKey string }
+	products := []productPrompt{
+		{"workbench", "Workbench", "/etc/rstudio/workbench.crt", "/etc/rstudio/workbench.key"},
+		{"connect", "Connect", "/etc/rstudio-connect/connect.crt", "/etc/rstudio-connect/connect.key"},
+		{"ppm", "Package Manager", "/etc/rstudio-pm/pm.crt", "/etc/rstudio-pm/pm.key"},
+	}
+	wanted := map[string]bool{}
+	for _, s := range selected {
+		// catalog uses "packagemanager" but flag/input keys use "ppm".
+		switch s {
+		case "packagemanager":
+			wanted["ppm"] = true
+		default:
+			wanted[s] = true
+		}
+	}
+
+	for _, p := range products {
+		if !wanted[p.key] {
+			continue
+		}
+		// Hostname.
+		def := defaultHost
+		if v, ok := hostnameOverrides[p.key]; ok {
+			def = v
+		}
+		got, _ := d.Input(p.label+" public hostname:", def)
+		in[p.key+"_hostname"] = got
+
+		// Cert + key. Skip-prompted by typing "skip" in interactive mode
+		// (handled inside prompt.ErrSkipped), which leaves the input empty
+		// and SKIPs the dependent x509 checks.
+		certPath, _ := d.Input(p.label+" SSL cert path (or 'skip'):", p.defaultCert)
+		in[p.key+"_cert"] = certPath
+		keyPath, _ := d.Input(p.label+" SSL key path (or 'skip'):", p.defaultKey)
+		in[p.key+"_key"] = keyPath
+	}
+
+	// IdP type + metadata URL.
+	if idp == "" {
+		idp, _ = d.Select("Identity provider for Workbench/Connect:", []string{"none", "saml", "oidc", "ldap"}, "none")
+	}
+	in["idp"] = idp
+	if wanted["workbench"] && idp != "none" && idp != "" {
+		def := ""
+		switch idp {
+		case "saml":
+			def = "https://idp.example.com/saml/metadata"
+		case "oidc":
+			def = "https://idp.example.com/.well-known/openid-configuration"
+		}
+		got, _ := d.Input("IdP metadata or discovery URL (or 'skip'):", def)
+		in["idp_metadata_url"] = got
+	}
+
+	// SMTP host for Connect.
+	if wanted["connect"] {
+		got, _ := d.Input("Outbound SMTP host for Connect (or 'skip'):", "smtp.example.com")
+		in["connect_smtp_host"] = got
+	}
+
 	return in
 }
 

@@ -23,7 +23,7 @@ for img in "${IMAGES[@]}"; do
         apt-get update -qq
         apt-get install -yqq --no-install-recommends ca-certificates curl iproute2 procps openssl >/dev/null
       elif command -v dnf >/dev/null; then
-        dnf -y install ca-certificates curl iproute procps-ng openssl which >/dev/null
+        dnf -y --allowerasing install ca-certificates curl iproute procps-ng openssl which >/dev/null
       fi
 
       ./pev version

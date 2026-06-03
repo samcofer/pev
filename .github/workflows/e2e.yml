@@ -46,7 +46,8 @@ jobs:
                 apt-get update -qq
                 apt-get install -yqq --no-install-recommends ca-certificates curl iproute2 procps openssl >/dev/null
               elif command -v dnf >/dev/null; then
-                dnf -y install ca-certificates curl iproute procps-ng openssl which >/dev/null
+                # --allowerasing handles Alma's curl-minimal vs full curl conflict.
+                dnf -y --allowerasing install ca-certificates curl iproute procps-ng openssl which >/dev/null
               fi
 
               echo "::group::pev version"
