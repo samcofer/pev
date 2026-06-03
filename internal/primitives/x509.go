@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -130,14 +131,14 @@ func matchCertKey(cert *x509.Certificate, keyPath string) error {
 	}
 	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
-		// Try PKCS#8.
+		// Try PKCS#8. Wrap both parse errors so callers can see what failed.
 		anyKey, err2 := x509.ParsePKCS8PrivateKey(block.Bytes)
 		if err2 != nil {
-			return fmt.Errorf("parse key (PKCS1: %w; PKCS8: %v)", err, err2)
+			return fmt.Errorf("parse key: %w", errors.Join(err, err2))
 		}
 		k, ok := anyKey.(*rsa.PrivateKey)
 		if !ok {
-			return fmt.Errorf("non-RSA private key not supported in v1")
+			return errors.New("non-RSA private key not supported in v1")
 		}
 		key = k
 	}

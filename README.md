@@ -12,6 +12,12 @@ Assess Linux readiness before installing **Posit Workbench**, **Posit Connect**,
 
 Today, the prereq verification call before a Posit install is a manual checklist exercise driven by a runbook, interpreted live by an SE on a Webex call. That process is slow, inconsistent across SEs, and produces no shareable artifact. pev replaces the manual pass with an automated assessment that defaults to discovery (it shells out to the same OS commands a Linux admin would type at the terminal) and produces a graded report identifying every blocking issue *before* the install session — turning the prereq meeting from "let me poke around your box" into "let's review the report you ran yesterday."
 
+## Scope
+
+**pev assesses the host's readiness BEFORE any Posit product is installed.** It checks OS support, sizing, network egress, system packages, customer-supplied SSL cert/key validity, R/Python/Quarto presence at the expected paths, IdP and SMTP reachability — every prereq the customer has to satisfy ahead of the install session.
+
+**pev explicitly does NOT validate installed products.** License activation (`rstudio-server license-manager status`), product binary presence, post-install config files (`rserver.conf`, `rstudio-connect.gcfg`, `rstudio-pm.gcfg`), and content-deployment smoke tests are the responsibility of [`posit-dev/vip`](https://github.com/posit-dev/vip). If a check requires a Posit product to be installed first, it belongs in `vip`, not here.
+
 ## Install
 
 ### Verified install (recommended)
@@ -79,20 +85,20 @@ Every built-in check maps to an authoritative Posit doc and (where applicable) t
 |------|----------|
 | OS support | Ubuntu 22.04 / 24.04, RHEL/Alma/Rocky 8 / 9 / 10 (Ubuntu 20.04 flagged blocking) |
 | Sizing | Workbench 4c/8GB/100GB · Connect 4GB/100GB · PPM 4c/16GB/500GB |
-| Network egress | cdn.rstudio.com, cdn.posit.co, packagemanager.posit.co, rspm-sync.rstudio.com, wyDay license |
+| Network egress | cdn.rstudio.com, cdn.posit.co, packagemanager.posit.co, rspm-sync.rstudio.com, wyDay license activation |
 | System packages | gdebi-core, libssl-dev / openssl-devel, libxml2-dev, libcurl-dev |
-| Workbench | rserver binary, license-manager status, /etc/rstudio/rserver.conf SSL, /opt/R/*, /opt/python/*, Quarto, IdP reachability |
-| Connect | rstudio-connect binary, license-manager status, SSL cert/key match, SMTP, Quarto |
-| PPM | rstudio-pm binary, license-manager status, SSL cert/key match, rspm-sync.rstudio.com reachable |
+| Workbench prereqs | customer-supplied SSL cert/key validity, /opt/R/\*, /opt/python/\*, Quarto, IdP metadata reachability |
+| Connect prereqs | customer-supplied SSL cert/key validity, SMTP reachability, Quarto |
+| PPM prereqs | customer-supplied SSL cert/key validity, rspm-sync.rstudio.com reachable |
 
-See [docs/runbook-mapping.md](docs/runbook-mapping.md) for the full prereq → check ID table.
+Anything that requires a Posit product to be already installed (license-manager status, parsing rserver.conf, etc.) is **out of scope** — that's `vip`'s job. See [docs/runbook-mapping.md](docs/runbook-mapping.md) for the full prereq → check ID table and the explicit out-of-scope list.
 
 ## Permissions
 
-pev runs as root or non-root. Checks that need root (license-manager status, reading /etc/rstudio*/, listing license files in /var/lib/rstudio-*/) are gated by `requires_root: true` and emit `SKIPPED (requires root)` when run as a normal user. The run never aborts.
+pev runs as root or non-root. The pre-install catalog is mostly readable by any user (DNS, HTTP, /opt/* listings, sysctl). Checks that need root (e.g. reading customer-supplied SSL keys at mode 0600) are gated by `requires_root: true` and emit `SKIPPED (requires root)` when run as a normal user. The run never aborts.
 
 ```bash
-sudo ./pev assess         # full coverage, including license + ssl-config checks
+sudo ./pev assess         # full coverage, including SSL-key checks
 ./pev assess              # everything that doesn't need root
 ```
 

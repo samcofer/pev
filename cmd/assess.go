@@ -56,11 +56,12 @@ func newAssessCmd() *cobra.Command {
 			}
 			defer logFile.Close()
 
-			ctx, cancel := context.WithCancel(cmd.Context())
-			defer cancel()
-			if ctx == nil {
-				ctx = context.Background()
+			parent := cmd.Context()
+			if parent == nil {
+				parent = context.Background()
 			}
+			ctx, cancel := context.WithCancel(parent)
+			defer cancel()
 
 			started := time.Now()
 

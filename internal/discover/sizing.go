@@ -64,8 +64,11 @@ func readDiskFreeGB(path string) int {
 	if err := syscall.Statfs(path, &st); err != nil {
 		return 0
 	}
-	bavail := uint64(st.Bavail) //nolint:gosec // G115: Bavail is non-negative by definition
-	bsize := uint64(st.Bsize)   //nolint:gosec // G115: Bsize is non-negative by definition
+	// On linux/amd64 Bavail is already uint64; on linux/386 it is uint32. The
+	// conversions are required for portability even though they may be
+	// no-ops on a given target — silence both unconvert and gosec.
+	bavail := uint64(st.Bavail) //nolint:gosec,unconvert // platform-portable widening
+	bsize := uint64(st.Bsize)   //nolint:gosec,unconvert // platform-portable widening
 	gb := (bavail * bsize) / (1024 * 1024 * 1024)
 	if gb > uint64(math.MaxInt) {
 		return math.MaxInt

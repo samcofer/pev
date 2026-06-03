@@ -2,6 +2,10 @@
 
 `pev` follows a small, deliberately conventional Go layout that mirrors `sol-eng/wbi` for SE familiarity.
 
+## Scope
+
+pev is a **pre-install** validator. Every check in the catalog must be satisfiable before any Posit product is installed on the host. Anything that requires the product to be installed first (license activation, rserver.conf parsing, deployed content, product version reads) belongs in [`vip`](https://github.com/posit-dev/vip), not here.
+
 ```
 main.go ──► cmd/* (cobra)
               │

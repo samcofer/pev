@@ -74,8 +74,8 @@ jobs:
               echo "::group::pev assess (non-root, no egress)"
               # Run again as a non-root user to exercise the requires_root SKIP
               # path. Copy the binary to a world-readable location (the mounted
-              # /work dir's owner+permissions vary by container OS) and use a
-              # writable out-dir under /tmp.
+              # /work directory owner and permissions vary by container OS) and
+              # use a writable out-dir under /tmp.
               cp ./pev /tmp/pev-bin
               chmod 0755 /tmp/pev-bin
               mkdir -p /tmp/pev-nobody && chmod 0777 /tmp/pev-nobody
@@ -88,7 +88,12 @@ jobs:
               fi
               ls /tmp/pev-nobody/
               test -f /tmp/pev-nobody/pev-report-*.md
-              # Confirm at least one requires_root SKIP appears in the JSON.
-              grep -q "requires root" /tmp/pev-nobody/pev-report-*.json
+              test -f /tmp/pev-nobody/pev-report-*.json
+              # Confirm the non-root run still produced a usable report and
+              # that the engine cleanly SKIPped checks that needed inputs we
+              # did not supply (the SSL cert/key paths). Since pev is a
+              # pre-install validator, no checks require root once the
+              # post-install catalog is removed.
+              grep -q "missing or invalid input" /tmp/pev-nobody/pev-report-*.json
               echo "::endgroup::"
             '

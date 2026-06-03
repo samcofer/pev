@@ -4,7 +4,9 @@ Guidance for AI-assisted (and human-assisted) contributions to `pev`. Read top-t
 
 ## 1. Project mission
 
-`pev` is a single-binary Linux CLI that assesses a host's readiness to install Posit Workbench, Connect, and Package Manager. It is **read-only by default**, ships as a static binary with no runtime deps on the target system, runs as root or non-root, and produces a Markdown report (human) plus a JSON sidecar (diffable). The check catalog is authored as YAML and embedded at build time; customers and SEs can add custom YAML packs without recompiling.
+`pev` is a single-binary Linux CLI that assesses a host's readiness **before** any Posit product is installed. It is **read-only by default**, ships as a static binary with no runtime deps on the target system, runs as root or non-root, and produces a Markdown report (human) plus a JSON sidecar (diffable). The check catalog is authored as YAML and embedded at build time; customers and SEs can add custom YAML packs without recompiling.
+
+**Scope boundary:** validation of an *installed* Posit product (license activation, parsing rserver.conf / rstudio-connect.gcfg / rstudio-pm.gcfg, deployed-content tests, rstudio-server license-manager) is the responsibility of [`vip`](https://github.com/posit-dev/vip), **not pev**. If a check requires a Posit product to already be installed, it does not belong in this repo.
 
 ## 2. Architecture map
 
@@ -41,16 +43,19 @@ Guidance for AI-assisted (and human-assisted) contributions to `pev`. Read top-t
 
 ## 5. Authoring a new built-in check
 
+**Scope test before anything else.** A check is in scope for pev only if a customer can satisfy it *before* installing any Posit product. If the check inspects state that exists only after install (license-manager output, parsing product config files, deployed-content fetches, product binaries on disk), it belongs in [`vip`](https://github.com/posit-dev/vip), not here. Reject the check at PR review.
+
 Checklist:
 
-1. Pick an `id` using dotted convention `<area>.<topic>.<facet>` (e.g. `workbench.idp.metadata`). Ids are forever — duplicates cause load failure.
-2. Pick a `severity` (`blocking` | `warning` | `info`). Block customer installs only on truly install-blocking issues.
-3. Write a `why:` block — this rationale is shown in the report. Two sentences, plain English, customer-readable.
-4. Pick a `primitive:` and the matching `with:` payload. Run `pev list-checks --tags <existing-tag>` to find similar examples.
-5. List `references:` URLs from Posit docs (kapa-verified preferred).
-6. Gate via `applies_to.os/products/arch` and `requires_root` as appropriate.
-7. If the check derives from a runbook prereq, add a row to `docs/runbook-mapping.md`.
-8. `make lint && make test`. If you added a new primitive too, see §6.
+1. Confirm the check is a pre-install prerequisite (see scope test above).
+2. Pick an `id` using dotted convention `<area>.<topic>.<facet>` (e.g. `workbench.idp.metadata`). Ids are forever — duplicates cause load failure.
+3. Pick a `severity` (`blocking` | `warning` | `info`). Block customer installs only on truly install-blocking issues.
+4. Write a `why:` block — this rationale is shown in the report. Two sentences, plain English, customer-readable.
+5. Pick a `primitive:` and the matching `with:` payload. Run `pev list-checks --tags <existing-tag>` to find similar examples.
+6. List `references:` URLs from Posit docs (kapa-verified preferred).
+7. Gate via `applies_to.os/products/arch` and `requires_root` as appropriate.
+8. If the check derives from a runbook prereq, add a row to `docs/runbook-mapping.md`.
+9. `make lint && make test`. If you added a new primitive too, see §6.
 
 ## 6. Authoring a new primitive
 
@@ -90,6 +95,7 @@ See `docs/release-process.md`. Tag format `vX.Y.Z`. Conventional Commits drive t
 
 - Windows / macOS — not in scope.
 - Kubernetes / containerized Posit deployments — not in v1.
-- Workbench Launcher / Slurm / K8s session-cluster validation — Phase 2 catalog.
+- Workbench Launcher / Slurm / K8s session-cluster validation — Phase 2 catalog (still pre-install gates only).
 - Pro Drivers depth beyond presence — Phase 2.
 - Remediation (`pev fix`) — explicitly v2.
+- **Anything that runs against an installed Posit product** — that is [`vip`](https://github.com/posit-dev/vip)'s job. License activation, rserver.conf parsing, deployed-content tests, product version checks, etc. all belong there.

@@ -1,6 +1,8 @@
 # Runbook prereq → check ID mapping
 
-Each row in the customer onboarding runbook (the BCBS-style "Prerequisites" tab) maps to one or more pev built-in checks. This file is the contract — when a runbook prereq lands here, the corresponding YAML check exists in the catalog and is exercised by CI.
+Each row in the customer onboarding runbook (the BCBS-style "Prerequisites" tab) maps to one or more pev built-in checks. **pev's scope is strictly pre-install prerequisites.** Validation of an *installed* Posit product (license activation, rserver.conf SSL config, deployed-content tests) is the responsibility of [`vip`](https://github.com/posit-dev/vip), not pev.
+
+This file is the contract — when a runbook prereq lands here, the corresponding YAML check exists in the catalog and is exercised by CI.
 
 ## Shared infrastructure (all products)
 
@@ -13,38 +15,43 @@ Each row in the customer onboarding runbook (the BCBS-style "Prerequisites" tab)
 | Outbound networking — license activation | `net.egress.license-activation` | warning |
 | R installed under `/opt/R/<version>` | `workbench.r.versioned-install` | warning |
 | Python installed under `/opt/python/<version>` | `workbench.python.versioned-install` | warning |
-| Posit license obtained, path documented | `workbench.license.file-present`, `connect.license.file-present`, `ppm.license.file-present` | info |
 | System dependencies (build deps for R/Python packages) | `pkg.openssl-dev`, `pkg.libcurl-dev`, `pkg.libxml2-dev`, `pkg.gdebi.ubuntu` | warning |
 
 ## Package Manager
 
 | Runbook prereq | pev check ID(s) | Severity |
 |---|---|---|
-| SSL certificate for PPM hostname | `ppm.ssl.cert-key-match` | blocking |
+| SSL certificate for PPM hostname (customer-supplied) | `ppm.ssl.cert-key-match` | blocking |
 | Outbound to Posit Package Service | `ppm.egress.sync` | blocking |
 | Sufficient disk for package cache | `sizing.packagemanager.recommended` | warning |
-| License activated | `ppm.license.activated`, `ppm.license.file-present` | blocking, info |
 
 ## Connect
 
 | Runbook prereq | pev check ID(s) | Severity |
 |---|---|---|
-| SSL certificate for Connect hostname | `connect.ssl.cert-key-match` | blocking |
+| SSL certificate for Connect hostname (customer-supplied) | `connect.ssl.cert-key-match` | blocking |
 | Outbound email server access | `connect.smtp.reachable` | warning |
-| Quarto installed | `connect.quarto.present` | warning |
-| License activated | `connect.license.activated`, `connect.license.file-present` | blocking, info |
-| Authentication provider details gathered | _(human-only checklist)_ | — |
+| Quarto installed at `/opt/quarto/<version>` | `connect.quarto.present` | warning |
 
 ## Workbench
 
 | Runbook prereq | pev check ID(s) | Severity |
 |---|---|---|
-| SSL certificate for Workbench hostname | `workbench.ssl.cert-key-match`, `workbench.ssl.config` | blocking, warning |
-| Quarto installed | `workbench.quarto.present` | warning |
-| Authentication provider details gathered | `workbench.idp.metadata` | warning |
+| SSL certificate for Workbench hostname (customer-supplied) | `workbench.ssl.cert-key-match` | blocking |
+| Quarto available on PATH | `workbench.quarto.present` | warning |
+| IdP metadata or discovery URL reachable | `workbench.idp.metadata` | warning |
 | Desired editors identified | _(human-only checklist)_ | — |
-| License activated | `workbench.license.activated`, `workbench.license.file-present` | blocking, info |
+
+## Out of scope (handled by `vip`, not pev)
+
+These were intentionally removed from the catalog because they validate state that only exists *after* a Posit product has been installed, which is `vip`'s job:
+
+- `*.license.activated` — `rstudio-server license-manager status` and the Connect/PPM equivalents
+- `*.license.file-present` — globbing `/var/lib/rstudio-*/*.lic`
+- `*.binary.present` — `/usr/lib/rstudio-server/bin/rserver`, `/opt/rstudio-connect/bin/rstudio-connect`, `/opt/rstudio-pm/bin/rstudio-pm`
+- `workbench.ssl.config` — parsing `/etc/rstudio/rserver.conf` for `ssl-enabled=1`
+- Anything that depends on `rstudio-server`, `rstudio-connect`, or `rstudio-pm` being installed
 
 ## When to add a row
 
-Whenever you add a YAML check whose origin is a runbook prereq, add a row here in the same PR. CI runs `make lint` against the catalog; this file is checked manually during PR review.
+Whenever you add a YAML check whose origin is a runbook prereq, add a row here in the same PR. A check is in scope for pev only if a customer can satisfy it *before* installing any Posit product. If satisfaction requires the product to already be installed, it belongs in `vip`.
