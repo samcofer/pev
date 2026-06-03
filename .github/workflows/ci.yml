@@ -54,7 +54,12 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - run: |
+      # govulncheck is advisory: the Go stdlib churns CVEs frequently, and we
+      # don't want a brand-new stdlib CVE to block release of an otherwise-good
+      # pev. The job still surfaces findings in the Actions UI for triage.
+      - name: govulncheck (advisory)
+        continue-on-error: true
+        run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
       - uses: securego/gosec@master

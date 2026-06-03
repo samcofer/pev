@@ -60,8 +60,11 @@ jobs:
               echo "::group::pev assess (root, no egress)"
               # No Posit products are installed in these clean images, so we
               # expect blocking failures on workbench/connect/ppm presence
-              # checks. The artifact files must still be written.
-              ./pev assess --non-interactive --out-dir /tmp/pev-root --skip-tags egress || true
+              # checks. We pass --products explicitly so applies_to.products
+              # gates open (auto-detect would otherwise SKIP every per-product
+              # check on a clean image).
+              ./pev assess --non-interactive --products workbench,connect,packagemanager \
+                --out-dir /tmp/pev-root --skip-tags egress || true
               ls /tmp/pev-root/
               test -f /tmp/pev-root/pev-report-*.md
               test -f /tmp/pev-root/pev-report-*.json
@@ -70,12 +73,18 @@ jobs:
 
               echo "::group::pev assess (non-root, no egress)"
               # Run again as a non-root user to exercise the requires_root SKIP
-              # path. Use nobody (UID 65534), which both Debian and RHEL ship.
-              mkdir -p /tmp/pev-nobody && chown -R 65534:65534 /tmp/pev-nobody
+              # path. Copy the binary to a world-readable location (the mounted
+              # /work dir's owner+permissions vary by container OS) and use a
+              # writable out-dir under /tmp.
+              cp ./pev /tmp/pev-bin
+              chmod 0755 /tmp/pev-bin
+              mkdir -p /tmp/pev-nobody && chmod 0777 /tmp/pev-nobody
               if command -v runuser >/dev/null; then
-                runuser -u nobody -- ./pev assess --non-interactive --out-dir /tmp/pev-nobody --skip-tags egress || true
+                runuser -u nobody -- /tmp/pev-bin assess --non-interactive \
+                  --products workbench,connect,packagemanager \
+                  --out-dir /tmp/pev-nobody --skip-tags egress || true
               else
-                su -s /bin/sh nobody -c "./pev assess --non-interactive --out-dir /tmp/pev-nobody --skip-tags egress" || true
+                su -s /bin/sh nobody -c "/tmp/pev-bin assess --non-interactive --products workbench,connect,packagemanager --out-dir /tmp/pev-nobody --skip-tags egress" || true
               fi
               ls /tmp/pev-nobody/
               test -f /tmp/pev-nobody/pev-report-*.md

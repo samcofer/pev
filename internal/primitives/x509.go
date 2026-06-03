@@ -131,11 +131,11 @@ func matchCertKey(cert *x509.Certificate, keyPath string) error {
 	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
 		// Try PKCS#8.
-		any, err2 := x509.ParsePKCS8PrivateKey(block.Bytes)
+		anyKey, err2 := x509.ParsePKCS8PrivateKey(block.Bytes)
 		if err2 != nil {
-			return fmt.Errorf("parse key: %v / %v", err, err2)
+			return fmt.Errorf("parse key (PKCS1: %w; PKCS8: %v)", err, err2)
 		}
-		k, ok := any.(*rsa.PrivateKey)
+		k, ok := anyKey.(*rsa.PrivateKey)
 		if !ok {
 			return fmt.Errorf("non-RSA private key not supported in v1")
 		}

@@ -39,7 +39,7 @@ func Lint(checks []Check) []error {
 			continue
 		}
 		if _, err := Lookup(c.Primitive); err != nil {
-			errs = append(errs, fmt.Errorf("%s %v", prefix, err))
+			errs = append(errs, fmt.Errorf("%s %w", prefix, err))
 			continue
 		}
 		if allowed, ok := AllowedKeys(c.Primitive); ok && len(allowed) > 0 {

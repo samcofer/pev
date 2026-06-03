@@ -6,6 +6,7 @@ package system
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"time"
@@ -60,7 +61,7 @@ func RunCaptured(ctx context.Context, cmd string, timeout time.Duration) (Comman
 
 	if err != nil {
 		var ee *exec.ExitError
-		if asExit(err, &ee) {
+		if errors.As(err, &ee) {
 			res.ExitCode = ee.ExitCode()
 			return res, nil
 		}
@@ -68,23 +69,6 @@ func RunCaptured(ctx context.Context, cmd string, timeout time.Duration) (Comman
 	}
 	res.ExitCode = 0
 	return res, nil
-}
-
-// asExit unwraps to *exec.ExitError without pulling in errors.As at every call site.
-func asExit(err error, target **exec.ExitError) bool {
-	for cur := err; cur != nil; {
-		if e, ok := cur.(*exec.ExitError); ok {
-			*target = e
-			return true
-		}
-		type wrapped interface{ Unwrap() error }
-		w, ok := cur.(wrapped)
-		if !ok {
-			return false
-		}
-		cur = w.Unwrap()
-	}
-	return false
 }
 
 // CommandExists reports whether a command resolves on $PATH.

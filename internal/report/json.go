@@ -25,7 +25,8 @@ func WriteJSON(outDir, base string, rep checks.Report) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	// Reports are intentionally world-readable; see comment in markdown.go.
+	if err := os.WriteFile(path, data, 0o644); err != nil { //nolint:gosec // G306: see comment above
 		return "", err
 	}
 	return path, nil

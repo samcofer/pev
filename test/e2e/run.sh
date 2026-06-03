@@ -33,11 +33,12 @@ for img in "${IMAGES[@]}"; do
       ./pev assess --non-interactive --out-dir /tmp/pev-root --skip-tags egress || true
       ls /tmp/pev-root/
 
-      mkdir -p /tmp/pev-nobody && chown -R 65534:65534 /tmp/pev-nobody
+      cp ./pev /tmp/pev-bin && chmod 0755 /tmp/pev-bin
+      mkdir -p /tmp/pev-nobody && chmod 0777 /tmp/pev-nobody
       if command -v runuser >/dev/null; then
-        runuser -u nobody -- ./pev assess --non-interactive --out-dir /tmp/pev-nobody --skip-tags egress || true
+        runuser -u nobody -- /tmp/pev-bin assess --non-interactive --out-dir /tmp/pev-nobody --skip-tags egress || true
       else
-        su -s /bin/sh nobody -c "./pev assess --non-interactive --out-dir /tmp/pev-nobody --skip-tags egress" || true
+        su -s /bin/sh nobody -c "/tmp/pev-bin assess --non-interactive --out-dir /tmp/pev-nobody --skip-tags egress" || true
       fi
       ls /tmp/pev-nobody/
     '

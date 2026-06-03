@@ -10,24 +10,13 @@ import (
 	"github.com/posit-dev/pev/internal/checks"
 )
 
+// unknownf returns a StatusUnknown Result with a formatted reason. Used when
+// a primitive can't decide because its `with:` payload is malformed at runtime
+// (lint catches static cases at load time).
 func unknownf(c checks.Check, format string, a ...interface{}) checks.Result {
 	return checks.Result{
 		ID: c.ID, Title: c.Title, Severity: c.Severity,
 		Status: checks.StatusUnknown, Reason: fmt.Sprintf(format, a...),
-	}
-}
-
-func failf(c checks.Check, format string, a ...interface{}) checks.Result {
-	return checks.Result{
-		ID: c.ID, Title: c.Title, Severity: c.Severity,
-		Status: checks.StatusFail, Reason: fmt.Sprintf(format, a...),
-	}
-}
-
-func passf(c checks.Check, format string, a ...interface{}) checks.Result {
-	return checks.Result{
-		ID: c.ID, Title: c.Title, Severity: c.Severity,
-		Status: checks.StatusPass, Reason: fmt.Sprintf(format, a...),
 	}
 }
 

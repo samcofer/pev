@@ -16,7 +16,10 @@ func WriteMarkdown(outDir, base string, rep checks.Report) (string, error) {
 		return "", err
 	}
 	path := filepath.Join(outDir, base+".md")
-	if err := os.WriteFile(path, []byte(RenderMarkdown(rep)), 0o644); err != nil {
+	// Reports are intentionally world-readable so SEs and customers can hand
+	// them off via email/PR/Slack without chmod-ing first. They contain no
+	// secrets — license keys are scrubbed and credentials are never recorded.
+	if err := os.WriteFile(path, []byte(RenderMarkdown(rep)), 0o644); err != nil { //nolint:gosec // G306: see comment above
 		return "", err
 	}
 	return path, nil

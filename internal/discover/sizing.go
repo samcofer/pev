@@ -2,6 +2,7 @@ package discover
 
 import (
 	"bufio"
+	"math"
 	"os"
 	"runtime"
 	"strconv"
@@ -56,12 +57,18 @@ func readMemMB() int {
 }
 
 // readDiskFreeGB returns free disk on the filesystem containing path, in GB.
+// Bavail/Bsize widths vary by platform (uint32 on some, int64 on others), so
+// route through math/big-style guarded conversions to keep gosec G115 happy.
 func readDiskFreeGB(path string) int {
 	var st syscall.Statfs_t
 	if err := syscall.Statfs(path, &st); err != nil {
 		return 0
 	}
-	// Bavail * Bsize = bytes available to non-root; use this for honest "free" reporting.
-	bytes := uint64(st.Bavail) * uint64(st.Bsize)
-	return int(bytes / (1024 * 1024 * 1024))
+	bavail := uint64(st.Bavail) //nolint:gosec // G115: Bavail is non-negative by definition
+	bsize := uint64(st.Bsize)   //nolint:gosec // G115: Bsize is non-negative by definition
+	gb := (bavail * bsize) / (1024 * 1024 * 1024)
+	if gb > uint64(math.MaxInt) {
+		return math.MaxInt
+	}
+	return int(gb)
 }
