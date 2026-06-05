@@ -47,7 +47,8 @@ jobs:
                 apt-get install -yqq --no-install-recommends ca-certificates curl iproute2 procps openssl >/dev/null
               elif command -v dnf >/dev/null; then
                 # --allowerasing handles the curl-minimal vs full curl conflict on Alma.
-                dnf -y --allowerasing install ca-certificates curl iproute procps-ng openssl which >/dev/null
+                # util-linux ships runuser/su, which the minimal alma:10 image omits.
+                dnf -y --allowerasing install ca-certificates curl iproute procps-ng openssl which util-linux >/dev/null
               fi
 
               echo "::group::pev version"

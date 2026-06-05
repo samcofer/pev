@@ -22,7 +22,10 @@ jobs:
           cache: true
       - uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
+          # golangci-lint v2 requires a migrated config; the project still
+          # uses the v1 schema, so pin to the latest v1 release until the
+          # config is migrated.
+          version: v1.62.2
           args: --timeout=5m
       - run: go vet ./...
       - run: |
