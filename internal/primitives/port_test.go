@@ -1,6 +1,7 @@
 package primitives
 
 import (
+	"context"
 	"net"
 	"strconv"
 	"strings"
@@ -12,7 +13,8 @@ import (
 
 func TestPortPrimitive(t *testing.T) {
 	// Bind a TCP listener on a random port to use as the "open" target.
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	var lc net.ListenConfig
+	l, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -20,11 +20,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - uses: golangci/golangci-lint-action@v6
+      - uses: golangci/golangci-lint-action@v9
         with:
-          # golangci-lint-action v7+ drops support for golangci-lint v1
-          # and v2 requires a migrated config. Stay on action v6 (which
-          # still installs v1) until .golangci.yml is migrated.
           version: latest
           args: --timeout=5m
       - run: go vet ./...

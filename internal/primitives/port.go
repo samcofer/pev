@@ -40,7 +40,8 @@ func runPort(rc checks.RunCtx) checks.Result {
 	}
 	rc.CmdLog.Append(fmt.Sprintf("nc -vz %s %d", host, port))
 
-	conn, err := net.DialTimeout("tcp", addr, timeout)
+	d := net.Dialer{Timeout: timeout}
+	conn, err := d.DialContext(rc.Ctx, "tcp", addr)
 	if err != nil {
 		r.Status = checks.StatusFail
 		r.Reason = "tcp dial: " + err.Error()

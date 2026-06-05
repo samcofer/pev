@@ -16,7 +16,7 @@ func resolveFQDN(ctx context.Context, hostname string) string {
 	}
 	cctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-	if ip := primaryOutboundIP(); ip != "" {
+	if ip := primaryOutboundIP(cctx); ip != "" {
 		names, err := net.DefaultResolver.LookupAddr(cctx, ip)
 		if err == nil && len(names) > 0 {
 			return strings.TrimSuffix(names[0], ".")
@@ -30,8 +30,9 @@ func resolveFQDN(ctx context.Context, hostname string) string {
 
 // primaryOutboundIP opens a UDP "connection" to a public address — no packets
 // are sent — to learn which interface the kernel would route traffic through.
-func primaryOutboundIP() string {
-	c, err := net.Dial("udp", "1.1.1.1:80")
+func primaryOutboundIP(ctx context.Context) string {
+	var d net.Dialer
+	c, err := d.DialContext(ctx, "udp", "1.1.1.1:80")
 	if err != nil {
 		return ""
 	}

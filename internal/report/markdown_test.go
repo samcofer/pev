@@ -105,7 +105,7 @@ func TestRenderMarkdownStructure(t *testing.T) {
 		blockingIdx := strings.Index(got, "### Blocking")
 		envIdx := strings.Index(got, "## Environment")
 		findingsIdx := strings.Index(got, "## Findings")
-		if !(envIdx < findingsIdx && findingsIdx < blockingIdx) {
+		if envIdx >= findingsIdx || findingsIdx >= blockingIdx {
 			t.Errorf("section order wrong: env=%d findings=%d blocking=%d", envIdx, findingsIdx, blockingIdx)
 		}
 	}
