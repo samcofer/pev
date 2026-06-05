@@ -1,0 +1,77 @@
+name: posit-images
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Run pev inside the official Posit Workbench and Connect images. Unlike
+# e2e.yml (which runs against clean Ubuntu/Alma bases and expects the
+# install-prereq checks to FAIL), these images already have the product
+# installed on a properly-prepared base — the assertion is therefore that
+# pev finds zero *blocking* failures with the no-input baseline scenario
+# (--skip-tags egress,ssl). Warning-level FAILs are tolerated because they
+# depend on customer-supplied inputs (SMTP host, IdP metadata, Quarto
+# install path, etc.) that aren't present on the canned image.
+#
+# Images are pinned by repository digest (sha256), not tag, so an upstream
+# rebuild can't silently change pev's test results. To refresh, run
+# scripts/refresh-posit-images.sh and update the digests below.
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - product: workbench
+            image: docker.io/posit/workbench@sha256:3d76d4b38651287d158c59fe82fc7e7d5bb8de1a1178a922bd50a90892d0d87a
+          - product: connect
+            image: docker.io/posit/connect@sha256:8de3d13ba5fdd46576ecdcbdff43420305407192d2c0de462545eba1ba082de9
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build pev binary
+        env: { CGO_ENABLED: 0 }
+        run: go build -trimpath -ldflags "-s -w" -o pev ./
+
+      - name: Run pev inside ${{ matrix.product }} image
+        run: |
+          set -euo pipefail
+          mkdir -p out && chmod 0777 out
+          docker run --rm \
+            --entrypoint="" \
+            -v "$PWD/pev":/usr/local/bin/pev:ro \
+            -v "$PWD/out":/out \
+            "${{ matrix.image }}" \
+            pev assess --non-interactive --products "${{ matrix.product }}" \
+              --out-dir /out --skip-tags egress,ssl || true
+          report=$(ls out/pev-report-*.json | head -1)
+          test -n "$report"
+          echo "::group::summary"
+          jq '.summary' "$report"
+          echo "::endgroup::"
+          echo "::group::per-check status"
+          jq -r '.results[] | "\(.severity)\t\(.status)\t\(.id)"' "$report"
+          echo "::endgroup::"
+          blocking=$(jq -r '.summary.blocking_failures' "$report")
+          if [ "$blocking" != "0" ]; then
+            echo "::error::pev reported $blocking blocking failure(s) inside ${{ matrix.product }} image"
+            jq -r '.results[] | select(.severity=="blocking" and .status=="fail") | "  - \(.id): \(.reason // "")"' "$report"
+            exit 1
+          fi
+          echo "OK: ${{ matrix.product }} blocking_failures=0"
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pev-report-${{ matrix.product }}
+          path: out/
