@@ -48,7 +48,7 @@ func newDiscoverCmd() *cobra.Command {
 				return err
 			}
 			if outputFile != "" {
-				if err := os.WriteFile(outputFile, buf.Bytes(), 0o644); err != nil {
+				if err := os.WriteFile(outputFile, buf.Bytes(), 0o600); err != nil {
 					return fmt.Errorf("write %s: %w", outputFile, err)
 				}
 				fmt.Fprintf(os.Stderr, "wrote %s\n", outputFile)

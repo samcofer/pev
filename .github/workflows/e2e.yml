@@ -26,8 +26,8 @@ jobs:
           - almalinux:9
           - almalinux:10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
@@ -46,7 +46,7 @@ jobs:
                 apt-get update -qq
                 apt-get install -yqq --no-install-recommends ca-certificates curl iproute2 procps openssl >/dev/null
               elif command -v dnf >/dev/null; then
-                # --allowerasing handles Alma's curl-minimal vs full curl conflict.
+                # --allowerasing handles the curl-minimal vs full curl conflict on Alma.
                 dnf -y --allowerasing install ca-certificates curl iproute procps-ng openssl which >/dev/null
               fi
 
