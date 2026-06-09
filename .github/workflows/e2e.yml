@@ -91,9 +91,11 @@ jobs:
               test -f /tmp/pev-nobody/pev-report-*.md
               test -f /tmp/pev-nobody/pev-report-*.json
               # Confirm the non-root run produced a usable report and that
-              # checks needing inputs we didn't supply (SSL cert/key paths,
+              # checks needing inputs we did not supply (SSL cert/key paths,
               # SMTP host, etc.) cleanly surfaced as UNKNOWN with a
               # "missing required" reason, rather than crashing the engine.
-              grep -q '"reason": "missing required' /tmp/pev-nobody/pev-report-*.json
+              # NOTE: this whole script is inside bash -c $'...$' — keep this
+              # grep argument double-quoted so we don't close the outer quote.
+              grep -q "missing required" /tmp/pev-nobody/pev-report-*.json
               echo "::endgroup::"
             '
