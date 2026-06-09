@@ -1,6 +1,6 @@
 # Runbook prereq → check ID mapping
 
-Each row in the customer onboarding runbook (the BCBS-style "Prerequisites" tab) maps to one or more pev built-in checks. **pev's scope is strictly pre-install prerequisites.** Validation of an *installed* Posit product (license activation, rserver.conf SSL config, deployed-content tests) is the responsibility of [`vip`](https://github.com/posit-dev/vip), not pev.
+Each row in the standard customer onboarding runbook ("Prerequisites" tab) maps to one or more pev built-in checks. **pev's scope is strictly pre-install prerequisites.** Validation of an *installed* Posit product (license activation, rserver.conf SSL config, deployed-content tests) is the responsibility of [`vip`](https://github.com/posit-dev/vip), not pev.
 
 This file is the contract — when a runbook prereq lands here, the corresponding YAML check exists in the catalog and is exercised by CI.
 

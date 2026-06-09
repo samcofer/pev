@@ -40,10 +40,6 @@ func runHTTP(rc checks.RunCtx) checks.Result {
 	}
 	accept, _ := getIntSlice(rc.Check.With, "accept_status")
 
-	// cmdlog must be safe to copy-paste — for any URL that may point at a
-	// real binary (installers, package archives), the command must not
-	// download the body. -o /dev/null discards the body; -w prints only
-	// the status code; -I additionally sends HEAD when that's the real
 	r := checks.Result{
 		ID: rc.Check.ID, Title: rc.Check.Title,
 	}

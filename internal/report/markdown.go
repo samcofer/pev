@@ -17,8 +17,9 @@ func WriteMarkdown(outDir, base string, rep checks.Report) (string, error) {
 	}
 	path := filepath.Join(outDir, base+".md")
 	// Reports are intentionally world-readable so SEs and customers can hand
-	// them off via email/PR/Slack without chmod-ing first. They contain no
-	// secrets — license keys are scrubbed and credentials are never recorded.
+	// them off via email/PR/Slack without chmod-ing first. Secret-shaped
+	// inputs (see cmd/assess.secretInputKeys) are redacted before they
+	// reach the report; pev does not collect license keys or credentials.
 	if err := os.WriteFile(path, []byte(RenderMarkdown(rep)), 0o644); err != nil { //nolint:gosec // G306: see comment above
 		return "", err
 	}

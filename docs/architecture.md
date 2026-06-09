@@ -20,19 +20,19 @@ main.go ──► cmd/* (cobra)
               ├─► internal/primitives (cmd, file, dir, port, dns, http, x509, pkg, proc, sysctl, sizing)
               │     └─► system.RunCaptured (the only os/exec entry point)
               │
-              ├─► internal/logging  ── logrus JSON logger + replayable cmdlog
+              ├─► internal/logging  ── logrus JSON logger
               └─► internal/report   ── Markdown + JSON renderers + Diff
 ```
 
 ## Data flow per `pev assess`
 
-1. Parse flags. Initialize logger and cmdlog (under `--out-dir`).
+1. Parse flags. Initialize logger (under `--out-dir`).
 2. `discover.Gather()` populates `HostFacts` (read-only).
 3. Resolve selected products from `--products` / `--profile` / discovery.
 4. Load the catalog: embedded YAML packs + `--checks-file` files + `~/.config/pev/checks.d/*.yaml`.
 5. Lint the catalog — fail fast if any pack is malformed.
 6. Filter checks by `Products`, `Tags`, `SkipTags`, `SkipIDs`.
-7. For each check (sequentially, for deterministic cmdlog ordering):
+7. For each check (sequentially, for deterministic ordering):
    - `applies_to` gate, `requires_root` gate
    - Expand `{{ .Inputs.X }}` and `{{ .Facts.Y }}` in `with:`
    - Dispatch to the registered primitive

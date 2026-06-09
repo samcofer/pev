@@ -16,7 +16,7 @@ Guidance for AI-assisted (and human-assisted) contributions to `pev`. Read top-t
 | `internal/system/` | Wrappers around `os/exec`, file/dir helpers, root detection. **All shell-outs route through here.** |
 | `internal/operatingsystem/` | OS detection. `/etc/os-release` is authoritative; Alma/Rocky/CentOS/Oracle collapse onto `rhel-<major>`. |
 | `internal/discover/` | Read-only probes that build `HostFacts` (sizing, hostname, products, languages). |
-| `internal/logging/` | Logrus JSON file logger + replayable cmdlog with secret scrubbing. |
+| `internal/logging/` | Logrus JSON file logger. |
 | `internal/checks/` | The engine: data model, YAML loader, primitive registry, applies-to filter, lint. |
 | `internal/primitives/` | One file per primitive (`cmd`, `file`, `dir`, `port`, `dns`, `http`, `x509`, `pkg`, `proc`, `sysctl`, `sizing`). Each registers itself via `init()`. |
 | `internal/report/` | Pure rendering: Markdown, JSON, and `pev diff`. No exec, no network. |
@@ -38,7 +38,6 @@ Guidance for AI-assisted (and human-assisted) contributions to `pev`. Read top-t
 - **logrus JSON file logger** at `pev-log-<TS>.log` under `--out-dir`. Stdout stays plain.
 - **`system.RunCaptured(ctx, cmd, timeout)`** is the only sanctioned `os/exec` entry point.
 - **No color** in default output. Output is plain text so report Markdown round-trips through email and PR comments cleanly.
-- **cmdlog** at `pev-cmdlog-<host>-<TS>.sh` — every command pev ran, in order, copy-pasteable. Pre-scrubbed for license-key patterns.
 - **OS detection** was upgraded vs. wbi: `/etc/os-release` is parsed first; `/etc/redhat-release` and `/etc/issue` are fallbacks. Alma/Rocky/CentOS/Oracle normalize to `rhel-<major>`.
 
 ## 5. Authoring a new built-in check
@@ -51,7 +50,7 @@ Checklist:
 2. Pick an `id` using dotted convention `<area>.<topic>.<facet>` (e.g. `workbench.idp.metadata`). Ids are forever — duplicates cause load failure.
 3. Write a `why:` block — this rationale is shown in the report. Two sentences, plain English, customer-readable. Every FAIL is treated as worth investigating; pev does not classify checks into severity tiers.
 4. Pick a `primitive:` and the matching `with:` payload. Run `pev list-checks --tags <existing-tag>` to find similar examples.
-5. List `references:` URLs from Posit docs (kapa-verified preferred).
+5. List `references:` URLs from Posit docs. The docs.posit.co AI assistant is a useful way to surface the right page when unsure.
 6. Gate via `applies_to.os/products/arch` and `requires_root` as appropriate.
 7. If the check derives from a runbook prereq, add a row to `docs/runbook-mapping.md`.
 8. `make lint && make test`. If you added a new primitive too, see §6.
@@ -74,8 +73,8 @@ Only when an existing primitive cannot express the check.
 
 ## 8. What not to do
 
-- Never call `os/exec` outside `internal/system`. The wrapper is what makes cmdlog and timeouts work.
-- Never log secrets to stdout, the log file, or cmdlog. License keys are auto-scrubbed by `internal/logging.licenseKeyRE`; if you add a new secret type, extend that regex.
+- Never call `os/exec` outside `internal/system`. The wrapper centralizes timeouts and stdout/stderr capture.
+- Never log secrets to stdout or the log file. The only secret-shaped input today is `postgres_password`; it's gated by `cmd/assess.secretInputKeys` + `redactSecrets()` (JSON report) and the `Password()` prompt's `(redacted)` Q/A entry. Add new secret-shaped inputs to that map and to the prompt path.
 - Never write outside `--out-dir`. pev is read-only on the target system.
 - Never do raw network I/O outside the `http` / `port` / `dns` primitives. Centralization keeps timeouts honest.
 - Never abort the run on a missing input. Emit `SKIPPED (missing input X)` instead — the engine already does this when a `{{ .Inputs.X }}` template fails to expand.

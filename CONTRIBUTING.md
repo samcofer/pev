@@ -31,7 +31,7 @@ See CLAUDE.md §5. Quick path:
 
 1. Pick `id` in `<area>.<topic>.<facet>` form.
 2. Add YAML under `checks/<area>/`.
-3. Add references to Posit docs (`mcp__kapa__kapa_chat` is a good source).
+3. Add references to Posit docs (the docs.posit.co AI chat assistant is a good way to find the right page).
 4. Add a row to `docs/runbook-mapping.md` if it implements a runbook prereq.
 
 ## Adding a new primitive
@@ -49,4 +49,4 @@ See [SECURITY.md](SECURITY.md). Use GitHub Security Advisories for private discl
 
 ## License
 
-This repository ships without a LICENSE file at present. Treat the source as "all rights reserved" until one is added.
+pev is licensed under the [Apache License, Version 2.0](LICENSE). By submitting a contribution you agree it is licensed under the same terms.

@@ -42,9 +42,9 @@ checks:
     why: |
       Unsubscribed RHEL hosts can't `dnf install` from upstream, which
       means every Posit installer subcommand fails before it starts.
-      UBI variants and binary-compatible rebuilds (Alma, Rocky) don't
-      need this; the check only fires on stock RHEL where
-      subscription-manager is present.
+      UBI variants and binary-compatible rebuilds (Alma, Rocky, Oracle,
+      CentOS Stream) don't need a subscription, so this check SKIPs on
+      those distros and only enforces on stock RHEL.
     remediation: |
       Run `subscription-manager register --username=<user> --password=<pw>`
       (or attach via Activation Key) and `subscription-manager attach
@@ -53,8 +53,24 @@ checks:
       - https://docs.posit.co/resources/install-r.html#install-required-dependencies
     primitive: cmd
     with:
-      cmd: "command -v subscription-manager >/dev/null && subscription-manager status 2>&1 || true"
+      # The engine normalizes Alma/Rocky/Oracle/CentOS to rhel-<major>, so
+      # applies_to.os alone can't distinguish them from stock RHEL. We re-read
+      # /etc/os-release here and skip_exit=2 on rebuilds — subscription-manager
+      # is a Red-Hat-specific concept.
+      cmd: |
+        . /etc/os-release 2>/dev/null
+        case "${ID:-}" in
+          rhel|redhat) ;;
+          *) echo "ID=${ID:-unknown}; subscription-manager applies only to stock RHEL"; exit 2 ;;
+        esac
+        if ! command -v subscription-manager >/dev/null 2>&1; then
+          echo "subscription-manager not installed on a host that identifies as RHEL"
+          exit 1
+        fi
+        subscription-manager status 2>&1
+      expect_exit: 0
       expect_stdout_regex: 'Overall Status: Current'
+      skip_exit: 2
       timeout_seconds: 10
 
   - id: pkg.nfs-utils.installed

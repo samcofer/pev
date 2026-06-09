@@ -4,32 +4,44 @@ checks:
     title: Operating system is supported by Posit professional products
     category: Operating System
     tags: [os]
-    applies_to:
-      os: [ubuntu-22.04, ubuntu-24.04, rhel-8, rhel-9, rhel-10]
     why: |
       Posit Workbench, Posit Connect, and Posit Package Manager support
       Ubuntu 22.04, Ubuntu 24.04, and RHEL 8/9/10 (and binary-compatible
       rebuilds: Alma Linux, Rocky Linux). Ubuntu 20.04 is end-of-support and
-      not supported by current product releases.
+      not supported by current product releases. Ubuntu 26.04 has not yet
+      been added to the supported list.
     references:
       - https://docs.posit.co/platform-support.html
     primitive: cmd
     with:
-      cmd: "grep -E '^(PRETTY_NAME|ID|VERSION_ID)=' /etc/os-release"
+      # No applies_to.os here on purpose: the catalog must FAIL on hosts
+      # that fall outside the supported matrix, not silently SKIP them.
+      # The regex enumerates the supported IDs; anything else exits 1.
+      cmd: |
+        . /etc/os-release 2>/dev/null
+        echo "ID=${ID:-unknown} VERSION_ID=${VERSION_ID:-unknown}"
+        case "${ID:-}" in
+          ubuntu)
+            case "${VERSION_ID:-}" in 22.04|24.04) exit 0 ;; esac ;;
+          rhel|redhat|almalinux|rocky|centos|ol|oracle)
+            case "${VERSION_ID%%.*}" in 8|9|10) exit 0 ;; esac ;;
+        esac
+        exit 1
       expect_exit: 0
-      expect_stdout_regex: 'ID="?(ubuntu|rhel|rocky|almalinux|ol|centos)"?'
+      timeout_seconds: 5
 
   - id: os.architecture.amd64-or-arm64
     title: CPU architecture is amd64 or arm64
     category: Operating System
     tags: [os, arch]
-    applies_to:
-      arch: [amd64, arm64]
     why: |
       Posit professional products ship amd64 and arm64 Linux builds only.
       Other architectures cannot install the official packages.
     primitive: cmd
     with:
+      # No applies_to.arch here so unsupported architectures FAIL instead of
+      # SKIPping. (In practice pev itself only ships amd64+arm64, so this is
+      # belt-and-suspenders against a future cross-compiled binary.)
       cmd: "uname -m"
       expect_exit: 0
       expect_stdout_regex: '^(x86_64|aarch64)$'

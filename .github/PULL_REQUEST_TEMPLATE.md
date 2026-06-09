@@ -12,7 +12,6 @@
 - [ ] No catalog changes
 - [ ] New checks added (list IDs):
 - [ ] Existing checks modified (list IDs):
-- [ ] Severity changes (list IDs and old → new):
 
 ## Test plan
 - [ ] `make test` passes
@@ -22,4 +21,4 @@
 - [ ] Updated `docs/runbook-mapping.md` if a runbook prereq is now covered
 
 ## References
-<!-- Linked Posit doc URLs, internal Slack threads, customer tickets. -->
+<!-- Linked Posit doc URLs and any related GitHub issues. -->

@@ -50,6 +50,12 @@ release:
     name: pev
   draft: false
   prerelease: auto
+  # Ship the installer alongside the binaries so users on a tagged release can
+  # `curl ... releases/download/<tag>/install.sh | sh` to pin the bootstrap
+  # script to the same version they are installing. `main` keeps working as the
+  # always-latest one-liner.
+  extra_files:
+    - glob: scripts/install.sh
 
 changelog:
   sort: asc

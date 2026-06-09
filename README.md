@@ -20,38 +20,47 @@ Today, the prereq verification call before a Posit install is a manual checklist
 
 ## Install
 
-### Verified install (recommended)
-
-Releases are signed with [cosign](https://github.com/sigstore/cosign) keyless OIDC.
+### One-line install (recommended)
 
 ```bash
-# 1. Download the binary and the signed checksums file.
-curl -fsSL https://github.com/samcofer/pev/releases/latest/download/pev_linux_amd64 -o pev
-curl -fsSL https://github.com/samcofer/pev/releases/latest/download/pev_VERSION_checksums.txt -o checksums.txt
-curl -fsSL https://github.com/samcofer/pev/releases/latest/download/pev_VERSION_checksums.txt.sig -o checksums.txt.sig
+curl -fsSL https://raw.githubusercontent.com/samcofer/pev/main/scripts/install.sh | sh
+```
 
-# 2. Verify the checksums file's signature against the GitHub Actions OIDC identity.
+Detects amd64 / arm64, downloads the latest release, verifies the SHA-256 against the published `pev_<version>_checksums.txt`, and installs to `~/.local/bin/pev` (or `/usr/local/bin/pev` when run as root). Re-running upgrades in place.
+
+Pin a version or override the destination:
+
+```bash
+PEV_VERSION=v0.0.2 PEV_INSTALL_DIR=/opt/bin \
+  curl -fsSL https://raw.githubusercontent.com/samcofer/pev/main/scripts/install.sh | sh
+```
+
+If your security review requires reading the script before execution, save and inspect first:
+
+```bash
+curl -fsSLo install.sh https://raw.githubusercontent.com/samcofer/pev/main/scripts/install.sh
+less install.sh
+sh install.sh
+```
+
+### Verified install (cosign)
+
+Releases are signed with [cosign](https://github.com/sigstore/cosign) keyless OIDC. For environments that require manual signature verification:
+
+```bash
+VERSION=v0.0.2  # or whichever release you want
+curl -fsSL https://github.com/samcofer/pev/releases/download/${VERSION}/pev_linux_amd64                       -o pev
+curl -fsSL https://github.com/samcofer/pev/releases/download/${VERSION}/pev_${VERSION#v}_checksums.txt        -o checksums.txt
+curl -fsSL https://github.com/samcofer/pev/releases/download/${VERSION}/pev_${VERSION#v}_checksums.txt.sig    -o checksums.txt.sig
+
 cosign verify-blob \
   --certificate-identity-regexp 'github.com/samcofer/pev' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --signature checksums.txt.sig checksums.txt
 
-# 3. Verify the binary against the checksums file.
 sha256sum --check --ignore-missing checksums.txt
-
-chmod +x pev
-./pev assess
+chmod +x pev && ./pev version
 ```
-
-### Plain install (air-gapped customers)
-
-```bash
-curl -fsSL https://github.com/samcofer/pev/releases/latest/download/pev_linux_amd64 -o pev
-chmod +x pev
-./pev assess
-```
-
-Compare the SHA-256 against the value in the release notes if you skip cosign.
 
 ## Quickstart
 
@@ -234,11 +243,10 @@ checks:
 
 ## Reports & diffs
 
-Every `pev assess` writes four files:
+Every `pev assess` writes three files:
 
 - `pev-report-<host>-<TS>.md` — human Markdown report
 - `pev-report-<host>-<TS>.json` — machine sidecar (stable, sorted, schema-versioned)
-- `pev-cmdlog-<host>-<TS>.sh` — replayable shell script of every command pev ran (license keys redacted)
 - `pev-log-<TS>.log` — logrus JSON-lines for debugging
 
 `pev diff a.json b.json` classifies every check as **regression** (PASS→FAIL/UNKNOWN), **improvement** (FAIL→PASS), **status changed**, **added**, **removed**, or **evidence-only changed**. Exit code 1 iff regressions exist — perfect for a CI gate during install runbook automation.
@@ -280,4 +288,4 @@ See [SECURITY.md](SECURITY.md). Verify release artifacts with cosign as shown ab
 
 ## Maintainers
 
-Posit Solutions Engineering. Internal Slack: `#se-tools`. For customer-facing escalations, file via the standard Solutions support flow.
+Posit Solutions Engineering. File bugs and feature requests through [GitHub Issues](https://github.com/samcofer/pev/issues); discussion happens in [GitHub Discussions](https://github.com/samcofer/pev/discussions).

@@ -99,36 +99,16 @@ func (e *Engine) runOne(ctx context.Context, c Check) Result {
 
 // appliesTo matches a Check's AppliesTo gate against host facts. An empty
 // list for a dimension is "any" — only non-empty lists are restrictive.
+//
+// Product gating is intentionally absent here: it lives in Filter.Apply
+// (internal/checks/filter.go), which the assess command runs before
+// handing the surviving checks to the engine.
 func appliesTo(a AppliesTo, hf discover.HostFacts) bool {
 	if len(a.OS) > 0 && !contains(a.OS, hf.OS) {
 		return false
 	}
 	if len(a.Arch) > 0 && !contains(a.Arch, hf.Arch) {
 		return false
-	}
-	if len(a.Products) > 0 {
-		// Products gate runs against the user-selected product list (Run.Inputs).
-		// We piggyback on a synthetic input "_products_csv" set by the assess command.
-		// This keeps appliesTo a pure function of facts+inputs.
-		// If neither input nor any detected product matches, skip.
-		matched := false
-		for _, p := range a.Products {
-			if hf.Products.Workbench && p == "workbench" {
-				matched = true
-				break
-			}
-			if hf.Products.Connect && p == "connect" {
-				matched = true
-				break
-			}
-			if hf.Products.PackageManager && p == "packagemanager" {
-				matched = true
-				break
-			}
-		}
-		// Fall through: if user selected the product explicitly via flag, that's handled
-		// by the assess command pre-filtering the catalog before passing it in.
-		_ = matched
 	}
 	return true
 }

@@ -11,12 +11,6 @@ body:
       placeholder: "<area>.<topic>.<facet>"
     validations: { required: true }
   - type: dropdown
-    id: severity
-    attributes:
-      label: Severity
-      options: [blocking, warning, info]
-    validations: { required: true }
-  - type: dropdown
     id: primitive
     attributes:
       label: Primitive
