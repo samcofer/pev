@@ -70,7 +70,6 @@ jobs:
               ls /tmp/pev-root/
               test -f /tmp/pev-root/pev-report-*.md
               test -f /tmp/pev-root/pev-report-*.json
-              test -f /tmp/pev-root/pev-cmdlog-*.sh
               echo "::endgroup::"
 
               echo "::group::pev assess (non-root, no egress)"

@@ -22,7 +22,9 @@ jobs:
           cache: true
       - uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
+          # Pin the linter major to avoid a future v3 release silently
+          # changing CI behavior. Refresh deliberately when bumping rules.
+          version: v2.12.2
           args: --timeout=5m
       - run: go vet ./...
       - run: |
@@ -41,7 +43,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: go test ./... -race -shuffle=on -coverprofile=cover.out -covermode=atomic
-      - uses: codecov/codecov-action@v6
+      - uses: codecov/codecov-action@v7
         with:
           files: cover.out
           fail_ci_if_error: false
@@ -90,7 +92,7 @@ jobs:
             -X main.commit=${{ github.sha }} \
             -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             -o pev_${{ matrix.os }}_${{ matrix.arch }} ./
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: pev-${{ matrix.os }}-${{ matrix.arch }}
           path: pev_${{ matrix.os }}_${{ matrix.arch }}
