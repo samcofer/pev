@@ -1,13 +1,12 @@
 package checks
 
-// Filter narrows a Check list by user-supplied product, tag, severity, and ID
-// filters. All filters are optional; an empty filter passes everything through.
+// Filter narrows a Check list by user-supplied product, tag, and ID filters.
+// All filters are optional; an empty filter passes everything through.
 type Filter struct {
-	Products    []string // checks must mention at least one
-	Tags        []string // checks must have ALL of these tags
-	SkipTags    []string // checks must have NONE of these tags
-	SkipIDs     []string
-	SeverityMin Severity // info < warning < blocking
+	Products []string // checks must mention at least one
+	Tags     []string // checks must have ALL of these tags
+	SkipTags []string // checks must have NONE of these tags
+	SkipIDs  []string
 }
 
 // Apply runs the filter and returns the surviving checks in the input order.
@@ -29,9 +28,6 @@ func (f Filter) Apply(in []Check) []Check {
 			continue
 		}
 		if len(productSet) > 0 && len(c.AppliesTo.Products) > 0 && !overlap(c.AppliesTo.Products, productSet) {
-			continue
-		}
-		if !severityAtLeast(c.Severity, f.SeverityMin) {
 			continue
 		}
 		out = append(out, c)
@@ -75,13 +71,4 @@ func overlap(list []string, set map[string]struct{}) bool {
 		}
 	}
 	return false
-}
-
-// severityRank: info=0, warning=1, blocking=2. Empty (no minimum) passes everything.
-func severityAtLeast(have, min Severity) bool {
-	if min == "" {
-		return true
-	}
-	rank := map[Severity]int{SeverityInfo: 0, SeverityWarning: 1, SeverityBlocking: 2}
-	return rank[have] >= rank[min]
 }

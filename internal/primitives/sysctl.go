@@ -21,7 +21,7 @@ func runSysctl(rc checks.RunCtx) checks.Result {
 	path := "/proc/sys/" + strings.ReplaceAll(key, ".", "/")
 	data, err := os.ReadFile(path)
 	r := checks.Result{
-		ID: rc.Check.ID, Title: rc.Check.Title, Severity: rc.Check.Severity,
+		ID: rc.Check.ID, Title: rc.Check.Title,
 		Evidence: []checks.Evidence{{Path: path}},
 	}
 	if err != nil {

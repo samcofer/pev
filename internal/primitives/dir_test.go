@@ -19,7 +19,7 @@ func TestDirPrimitive(t *testing.T) {
 	}
 
 	pass := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityInfo, Primitive: "dir",
+		ID: "x", Title: "x", Primitive: "dir",
 		With: map[string]interface{}{"path": root, "must_exist": true, "glob": "*.lic", "glob_min_matches": 1},
 	}
 	if r := runRC(t, pass, discover.HostFacts{}); r.Status != checks.StatusPass {
@@ -27,7 +27,7 @@ func TestDirPrimitive(t *testing.T) {
 	}
 
 	missing := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityInfo, Primitive: "dir",
+		ID: "x", Title: "x", Primitive: "dir",
 		With: map[string]interface{}{"path": "/nonexistent/dir/path"},
 	}
 	if r := runRC(t, missing, discover.HostFacts{}); r.Status != checks.StatusFail {
@@ -36,7 +36,7 @@ func TestDirPrimitive(t *testing.T) {
 
 	// Glob with too few matches.
 	tooFew := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityInfo, Primitive: "dir",
+		ID: "x", Title: "x", Primitive: "dir",
 		With: map[string]interface{}{"path": root, "glob": "*.lic", "glob_min_matches": 5},
 	}
 	if r := runRC(t, tooFew, discover.HostFacts{}); r.Status != checks.StatusFail {

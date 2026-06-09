@@ -6,6 +6,7 @@ package primitives
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/posit-dev/pev/internal/checks"
 )
@@ -15,7 +16,7 @@ import (
 // (lint catches static cases at load time).
 func unknownf(c checks.Check, format string, a ...interface{}) checks.Result {
 	return checks.Result{
-		ID: c.ID, Title: c.Title, Severity: c.Severity,
+		ID: c.ID, Title: c.Title,
 		Status: checks.StatusUnknown, Reason: fmt.Sprintf(format, a...),
 	}
 }
@@ -41,6 +42,19 @@ func getInt(m map[string]interface{}, key string) (int, bool) {
 		return int(x), true
 	case float64:
 		return int(x), true
+	case string:
+		if x == "" {
+			return 0, false
+		}
+		// Allow YAML authors to write `port: "{{ .Inputs.postgres_port }}"`
+		// — the templater renders to a string at expand time, so the
+		// primitive has to reparse. Empty string is treated as missing
+		// so the primitive can SKIP cleanly.
+		n, err := strconv.Atoi(x)
+		if err != nil {
+			return 0, false
+		}
+		return n, true
 	}
 	return 0, false
 }

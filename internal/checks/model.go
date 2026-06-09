@@ -4,6 +4,7 @@
 package checks
 
 import (
+	"strings"
 	"time"
 
 	"github.com/posit-dev/pev/internal/discover"
@@ -11,16 +12,11 @@ import (
 
 // SchemaVersion is the major version of the pev report and YAML schemas.
 // Bumped only on breaking changes; pev diff rejects mismatched majors.
-const SchemaVersion = 1
-
-// Severity grades how badly a failed check affects an install.
-type Severity string
-
-const (
-	SeverityBlocking Severity = "blocking"
-	SeverityWarning  Severity = "warning"
-	SeverityInfo     Severity = "info"
-)
+//
+// v2 (2026-06): dropped Severity. Every FAIL is treated as worth
+// investigating; the catalog no longer tries to predict which failures
+// will block an install.
+const SchemaVersion = 2
 
 // Status is the outcome of running a check.
 type Status string
@@ -38,13 +34,25 @@ type AppliesTo struct {
 	Products []string `yaml:"products" json:"products,omitempty"`
 	Roles    []string `yaml:"roles" json:"roles,omitempty"`
 	Arch     []string `yaml:"arch" json:"arch,omitempty"`
+
+	// Requires lists tooling/language facts that must be true before the
+	// check runs. Tokens (any of):
+	//   r        — at least one /opt/R/<ver>/bin/R found
+	//   python   — at least one /opt/python/<ver>/bin/python found
+	//   quarto   — at least one quarto binary found
+	//   uv       — `uv` on PATH
+	//   pip      — `pip` or `pip3` on PATH
+	//   apt      — `apt-get` on PATH (Debian-family)
+	//   dnf      — `dnf` on PATH (RHEL-family)
+	// Missing facts SKIP the check with reason "missing required tooling: X".
+	Requires []string `yaml:"requires" json:"requires,omitempty"`
 }
 
 // Check is one entry in the catalog.
 type Check struct {
 	ID           string                 `yaml:"id" json:"id"`
 	Title        string                 `yaml:"title" json:"title"`
-	Severity     Severity               `yaml:"severity" json:"severity"`
+	Category     string                 `yaml:"category" json:"category,omitempty"`
 	Tags         []string               `yaml:"tags" json:"tags,omitempty"`
 	AppliesTo    AppliesTo              `yaml:"applies_to" json:"applies_to,omitempty"`
 	RequiresRoot bool                   `yaml:"requires_root" json:"requires_root,omitempty"`
@@ -54,6 +62,67 @@ type Check struct {
 	Primitive    string                 `yaml:"primitive" json:"primitive"`
 	With         map[string]interface{} `yaml:"with" json:"with,omitempty"`
 	Source       string                 `yaml:"-" json:"-"` // pack origin, for diagnostics
+}
+
+// Categories used for grouping in reports. Free-form strings are accepted in
+// YAML; these are the canonical set the renderer orders explicitly.
+const (
+	CategoryNetworking      = "Networking"
+	CategoryStorage         = "Storage"
+	CategoryOperatingSystem = "Operating System"
+	CategorySecurity        = "Security"
+	CategoryIdentity        = "Identity"
+	CategorySSL             = "SSL/TLS"
+	CategoryPackages        = "Packages"
+	CategorySizing          = "Sizing"
+	CategoryProduct         = "Product"
+	CategoryOther           = "Other"
+)
+
+// CategoryFor returns c.Category if set; otherwise derives a category from
+// tags, then from the id-prefix, falling back to "Other". Pure function so
+// tests and the renderer share the same logic.
+func CategoryFor(c Check) string {
+	if c.Category != "" {
+		return c.Category
+	}
+	for _, t := range c.Tags {
+		switch t {
+		case "egress", "network", "dns", "port":
+			return CategoryNetworking
+		case "ssl", "tls":
+			return CategorySSL
+		case "packages", "package":
+			return CategoryPackages
+		case "sizing":
+			return CategorySizing
+		case "idp", "identity", "auth":
+			return CategoryIdentity
+		case "selinux", "apparmor", "firewall", "security":
+			return CategorySecurity
+		case "storage", "disk":
+			return CategoryStorage
+		case "os", "arch":
+			return CategoryOperatingSystem
+		}
+	}
+	switch {
+	case strings.HasPrefix(c.ID, "net."):
+		return CategoryNetworking
+	case strings.HasPrefix(c.ID, "os."):
+		return CategoryOperatingSystem
+	case strings.HasPrefix(c.ID, "pkg."):
+		return CategoryPackages
+	case strings.HasPrefix(c.ID, "sizing."):
+		return CategorySizing
+	case strings.HasPrefix(c.ID, "sec."):
+		return CategorySecurity
+	case strings.HasSuffix(c.ID, ".ssl.cert-key-match"), strings.Contains(c.ID, ".ssl."):
+		return CategorySSL
+	case strings.HasPrefix(c.ID, "workbench."), strings.HasPrefix(c.ID, "connect."), strings.HasPrefix(c.ID, "ppm."):
+		return CategoryProduct
+	}
+	return CategoryOther
 }
 
 // Pack is one YAML file's contents.
@@ -73,25 +142,25 @@ type Evidence struct {
 
 // Result is what one check produced.
 type Result struct {
-	ID         string     `json:"id"`
-	Title      string     `json:"title"`
-	Severity   Severity   `json:"severity"`
-	Status     Status     `json:"status"`
-	Why        string     `json:"why,omitempty"`
-	Reason     string     `json:"reason,omitempty"` // short pass/fail/skip explanation
-	Evidence   []Evidence `json:"evidence,omitempty"`
-	References []string   `json:"references,omitempty"`
-	DurationMS int64      `json:"duration_ms"`
+	ID          string     `json:"id"`
+	Title       string     `json:"title"`
+	Category    string     `json:"category,omitempty"`
+	Status      Status     `json:"status"`
+	Why         string     `json:"why,omitempty"`
+	Reason      string     `json:"reason,omitempty"`      // short pass/fail/skip explanation
+	Remediation string     `json:"remediation,omitempty"` // copied from Check.Remediation when status=fail
+	Evidence    []Evidence `json:"evidence,omitempty"`
+	References  []string   `json:"references,omitempty"`
+	DurationMS  int64      `json:"duration_ms"`
 }
 
 // Summary tallies a Report's outcomes.
 type Summary struct {
-	Total    int `json:"total"`
-	Pass     int `json:"pass"`
-	Fail     int `json:"fail"`
-	Skip     int `json:"skip"`
-	Unknown  int `json:"unknown"`
-	Blocking int `json:"blocking_failures"`
+	Total   int `json:"total"`
+	Pass    int `json:"pass"`
+	Fail    int `json:"fail"`
+	Skip    int `json:"skip"`
+	Unknown int `json:"unknown"`
 }
 
 // Run records the assessment's input parameters.

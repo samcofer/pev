@@ -35,7 +35,7 @@ func runPkg(rc checks.RunCtx) checks.Result {
 	}
 
 	r := checks.Result{
-		ID: rc.Check.ID, Title: rc.Check.Title, Severity: rc.Check.Severity,
+		ID: rc.Check.ID, Title: rc.Check.Title,
 	}
 
 	check := func(name string) bool {
@@ -46,7 +46,6 @@ func runPkg(rc checks.RunCtx) checks.Result {
 		case "rpm":
 			cmd = "rpm -q " + name + " >/dev/null 2>&1 && echo installed"
 		}
-		rc.CmdLog.Append(cmd)
 		out, err := system.RunCaptured(rc.Ctx, cmd, 10*time.Second)
 		if err != nil {
 			return false

@@ -25,17 +25,15 @@ func TestLoadRejectsBadSchema(t *testing.T) {
 
 func TestLoadRejectsDuplicateID(t *testing.T) {
 	dir := t.TempDir()
-	body := `schema_version: 1
+	body := `schema_version: 2
 checks:
 - id: dupe
   title: a
   primitive: cmd
-  severity: info
   why: a
 - id: dupe
   title: b
   primitive: cmd
-  severity: info
   why: b
 `
 	p := filepath.Join(dir, "dup.yaml")
@@ -49,12 +47,11 @@ checks:
 
 func TestLoadOK(t *testing.T) {
 	dir := t.TempDir()
-	body := `schema_version: 1
+	body := `schema_version: 2
 checks:
 - id: ok.one
   title: one
   primitive: cmd
-  severity: info
   why: y
   with: { cmd: "true" }
 `

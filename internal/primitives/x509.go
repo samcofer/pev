@@ -29,7 +29,7 @@ func runX509(rc checks.RunCtx) checks.Result {
 	}
 
 	r := checks.Result{
-		ID: rc.Check.ID, Title: rc.Check.Title, Severity: rc.Check.Severity,
+		ID: rc.Check.ID, Title: rc.Check.Title,
 		Evidence: []checks.Evidence{{Path: certPath}},
 	}
 

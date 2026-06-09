@@ -19,7 +19,7 @@ func init() {
 func TestEngineSkipsOnAppliesTo(t *testing.T) {
 	e := Engine{Facts: discover.HostFacts{OS: "rhel-9"}}
 	c := Check{
-		ID: "x", Title: "x", Why: "x", Severity: SeverityInfo, Primitive: "test-fake",
+		ID: "x", Title: "x", Why: "x", Primitive: "test-fake",
 		AppliesTo: AppliesTo{OS: []string{"ubuntu-22.04"}}, With: map[string]interface{}{"expect": "pass"},
 	}
 	r := e.runOne(context.Background(), c)
@@ -34,7 +34,7 @@ func TestEngineExpandsTemplate(t *testing.T) {
 		Inputs: map[string]string{"workbench_hostname": "wb.example"},
 	}
 	c := Check{
-		ID: "x", Title: "x", Why: "x", Severity: SeverityInfo, Primitive: "test-fake",
+		ID: "x", Title: "x", Why: "x", Primitive: "test-fake",
 		With: map[string]interface{}{"name": "{{ .Inputs.workbench_hostname }}", "expect": "pass"},
 	}
 	r := e.runOne(context.Background(), c)
@@ -46,7 +46,7 @@ func TestEngineExpandsTemplate(t *testing.T) {
 func TestEngineSkipsOnMissingInput(t *testing.T) {
 	e := Engine{Facts: discover.HostFacts{}}
 	c := Check{
-		ID: "x", Title: "x", Why: "x", Severity: SeverityInfo, Primitive: "test-fake",
+		ID: "x", Title: "x", Why: "x", Primitive: "test-fake",
 		With: map[string]interface{}{"name": "{{ .Inputs.missing }}", "expect": "pass"},
 	}
 	r := e.runOne(context.Background(), c)

@@ -15,11 +15,20 @@ func init() {
 }
 
 // runHTTP issues a GET (or configured method) and accepts the response if its
-// status code falls in `accept_status` (default any 2xx).
+// status code falls in `accept_status` (default any 2xx). If `url` is unset
+// the check is UNKNOWN (a YAML authoring bug); if `url` expands to an empty
+// string the check SKIPs (the SE didn't supply the input the URL templates
+// against, e.g. an unconfigured IdP metadata URL).
 func runHTTP(rc checks.RunCtx) checks.Result {
-	url, ok := getString(rc.Check.With, "url")
-	if !ok || url == "" {
+	url, present := getString(rc.Check.With, "url")
+	if !present {
 		return unknownf(rc.Check, "missing required `url` field")
+	}
+	if url == "" {
+		return checks.Result{
+			ID: rc.Check.ID, Title: rc.Check.Title,
+			Status: checks.StatusSkip, Reason: "url input is empty (no value supplied)",
+		}
 	}
 	method := "GET"
 	if m, ok := getString(rc.Check.With, "method"); ok && m != "" {
@@ -31,10 +40,12 @@ func runHTTP(rc checks.RunCtx) checks.Result {
 	}
 	accept, _ := getIntSlice(rc.Check.With, "accept_status")
 
-	rc.CmdLog.Append(fmt.Sprintf("curl -I --max-time %d %s", int(timeout.Seconds()), url))
-
+	// cmdlog must be safe to copy-paste — for any URL that may point at a
+	// real binary (installers, package archives), the command must not
+	// download the body. -o /dev/null discards the body; -w prints only
+	// the status code; -I additionally sends HEAD when that's the real
 	r := checks.Result{
-		ID: rc.Check.ID, Title: rc.Check.Title, Severity: rc.Check.Severity,
+		ID: rc.Check.ID, Title: rc.Check.Title,
 	}
 
 	client := &http.Client{Timeout: timeout}

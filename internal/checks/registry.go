@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/posit-dev/pev/internal/discover"
-	"github.com/posit-dev/pev/internal/logging"
 )
 
 // RunCtx is everything a Runner needs to make a check decision.
@@ -15,7 +14,6 @@ type RunCtx struct {
 	Check  Check
 	Facts  discover.HostFacts
 	Inputs map[string]string
-	CmdLog *logging.CmdLog
 }
 
 // Runner evaluates one check and returns a populated Result.

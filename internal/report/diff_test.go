@@ -8,15 +8,15 @@ import (
 
 func TestComputeRegressionAndImprovement(t *testing.T) {
 	a := checks.Report{SchemaVersion: 1, Results: []checks.Result{
-		{ID: "a", Status: checks.StatusPass, Severity: checks.SeverityBlocking},
-		{ID: "b", Status: checks.StatusFail, Severity: checks.SeverityWarning},
-		{ID: "c", Status: checks.StatusPass, Severity: checks.SeverityInfo},
+		{ID: "a", Status: checks.StatusPass},
+		{ID: "b", Status: checks.StatusFail},
+		{ID: "c", Status: checks.StatusPass},
 	}}
 	b := checks.Report{SchemaVersion: 1, Results: []checks.Result{
-		{ID: "a", Status: checks.StatusFail, Severity: checks.SeverityBlocking}, // regression
-		{ID: "b", Status: checks.StatusPass, Severity: checks.SeverityWarning},  // improvement
-		{ID: "c", Status: checks.StatusPass, Severity: checks.SeverityInfo},     // unchanged
-		{ID: "d", Status: checks.StatusPass, Severity: checks.SeverityInfo},     // added
+		{ID: "a", Status: checks.StatusFail}, // regression
+		{ID: "b", Status: checks.StatusPass}, // improvement
+		{ID: "c", Status: checks.StatusPass}, // unchanged
+		{ID: "d", Status: checks.StatusPass}, // added
 	}}
 	d, err := Compute(a, b)
 	if err != nil {

@@ -1,8 +1,8 @@
-schema_version: 1
+schema_version: 2
 checks:
   - id: os.supported
     title: Operating system is supported by Posit professional products
-    severity: blocking
+    category: Operating System
     tags: [os]
     applies_to:
       os: [ubuntu-22.04, ubuntu-24.04, rhel-8, rhel-9, rhel-10]
@@ -15,12 +15,13 @@ checks:
       - https://docs.posit.co/platform-support.html
     primitive: cmd
     with:
-      cmd: "true"
+      cmd: "grep -E '^(PRETTY_NAME|ID|VERSION_ID)=' /etc/os-release"
       expect_exit: 0
+      expect_stdout_regex: 'ID="?(ubuntu|rhel|rocky|almalinux|ol|centos)"?'
 
   - id: os.architecture.amd64-or-arm64
     title: CPU architecture is amd64 or arm64
-    severity: blocking
+    category: Operating System
     tags: [os, arch]
     applies_to:
       arch: [amd64, arm64]
@@ -31,3 +32,4 @@ checks:
     with:
       cmd: "uname -m"
       expect_exit: 0
+      expect_stdout_regex: '^(x86_64|aarch64)$'

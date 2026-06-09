@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/posit-dev/pev/internal/system"
 )
@@ -23,11 +24,139 @@ var (
 // ScanRVersions returns every directory under known R roots whose <dir>/bin/R exists.
 func ScanRVersions() []string { return scanVersioned(rRoots, "bin/R") }
 
-// ScanPythonVersions returns every <dir>/bin/python or python3 under known Python roots.
+// ScanPythonVersions returns one entry per versioned Python install under
+// the known roots. If a directory contains both `bin/python` and
+// `bin/python3`, only the bare `python` path is reported (the sibling is
+// almost always a symlink to it). Avoids the "duplicate Python" entry the
+// previous version emitted on /opt/python images.
 func ScanPythonVersions() []string {
-	out := scanVersioned(pythonRoots, "bin/python3")
-	out = append(out, scanVersioned(pythonRoots, "bin/python")...)
+	withPlain := map[string]struct{}{}
+	for _, p := range scanVersioned(pythonRoots, "bin/python") {
+		withPlain[filepath.Dir(p)] = struct{}{}
+	}
+	out := append([]string{}, keysOf(withPlain)...)
+	for _, p := range scanVersioned(pythonRoots, "bin/python3") {
+		if _, ok := withPlain[filepath.Dir(p)]; ok {
+			continue
+		}
+		out = append(out, p)
+	}
+	// keysOf returned bare bin/ dirs; rehydrate with /python suffix.
+	for i, p := range out {
+		if filepath.Base(p) == "bin" {
+			out[i] = filepath.Join(p, "python")
+		}
+	}
 	return dedupeSorted(out)
+}
+
+func keysOf(m map[string]struct{}) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
+
+// LatestVersionedPath returns the entry whose <root>/<version>/ portion
+// sorts highest by semver-ish version. Inputs like
+// /opt/R/4.5.2/bin/R and /opt/python/3.14.2-linux-x86_64-gnu/bin/python
+// are split at /<version>/, the version is parsed leniently (numbers are
+// compared numerically; non-numeric suffixes break ties). Returns "" when
+// no input contains a parseable version segment.
+func LatestVersionedPath(paths []string) string {
+	type cand struct {
+		path string
+		key  []int
+		raw  string
+	}
+	var cands []cand
+	for _, p := range paths {
+		ver := versionSegmentOf(p)
+		if ver == "" {
+			continue
+		}
+		cands = append(cands, cand{path: p, key: parseVersion(ver), raw: ver})
+	}
+	if len(cands) == 0 {
+		return ""
+	}
+	sort.Slice(cands, func(i, j int) bool {
+		return compareVersionKeys(cands[i].key, cands[j].key) > 0
+	})
+	return cands[0].path
+}
+
+// versionSegmentOf returns the path component immediately after one of the
+// known versioned roots (/opt/R, /opt/python, etc.). Returns "" if no such
+// root prefixes p. Mirrors the layout pev's discovery uses, so adding a
+// new root requires touching only this list.
+func versionSegmentOf(p string) string {
+	cleaned := filepath.Clean(p)
+	for _, root := range append(append([]string{}, rRoots...), pythonRoots...) {
+		prefix := filepath.Clean(root) + string(filepath.Separator)
+		if !strings.HasPrefix(cleaned, prefix) {
+			continue
+		}
+		rest := strings.TrimPrefix(cleaned, prefix)
+		if i := strings.IndexByte(rest, filepath.Separator); i >= 0 {
+			return rest[:i]
+		}
+		return rest
+	}
+	return ""
+}
+
+// parseVersion lifts a version string into a comparable []int key. Numeric
+// runs become integers; the first non-numeric segment is dropped (so
+// "3.14.2-linux-x86_64-gnu" sorts as 3.14.2). Designed to be permissive,
+// not strict — pev only uses this to pick "latest" for user-install
+// checks, not to gate semver constraints.
+func parseVersion(s string) []int {
+	var out []int
+	cur := -1
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= '0' && c <= '9' {
+			if cur < 0 {
+				cur = 0
+			}
+			cur = cur*10 + int(c-'0')
+			continue
+		}
+		if cur >= 0 {
+			out = append(out, cur)
+			cur = -1
+		}
+		if c != '.' {
+			break
+		}
+	}
+	if cur >= 0 {
+		out = append(out, cur)
+	}
+	return out
+}
+
+// compareVersionKeys returns >0 when a is newer, <0 when older, 0 equal.
+func compareVersionKeys(a, b []int) int {
+	n := len(a)
+	if len(b) > n {
+		n = len(b)
+	}
+	for i := 0; i < n; i++ {
+		ai, bi := 0, 0
+		if i < len(a) {
+			ai = a[i]
+		}
+		if i < len(b) {
+			bi = b[i]
+		}
+		if ai != bi {
+			return ai - bi
+		}
+	}
+	return 0
 }
 
 // ScanQuartoVersions returns versioned roots plus the bundled+symlink fallbacks.

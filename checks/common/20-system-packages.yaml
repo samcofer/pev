@@ -1,8 +1,7 @@
-schema_version: 1
+schema_version: 2
 checks:
   - id: pkg.gdebi.ubuntu
     title: gdebi-core installed (Ubuntu)
-    severity: warning
     tags: [packages, ubuntu]
     applies_to:
       os: [ubuntu-22.04, ubuntu-24.04]
@@ -17,7 +16,6 @@ checks:
 
   - id: pkg.openssl-dev
     title: openssl development headers installed
-    severity: warning
     tags: [packages, build-deps]
     applies_to:
       products: [workbench, connect, packagemanager]
@@ -31,7 +29,6 @@ checks:
 
   - id: pkg.libcurl-dev
     title: libcurl development headers installed
-    severity: warning
     tags: [packages, build-deps]
     applies_to:
       products: [workbench, connect, packagemanager]
@@ -45,7 +42,6 @@ checks:
 
   - id: pkg.libxml2-dev
     title: libxml2 development headers installed
-    severity: warning
     tags: [packages, build-deps]
     applies_to:
       products: [workbench, connect, packagemanager]

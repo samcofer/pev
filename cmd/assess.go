@@ -10,6 +10,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/posit-dev/pev/internal/checks"
 	"github.com/posit-dev/pev/internal/discover"
@@ -17,6 +18,15 @@ import (
 	"github.com/posit-dev/pev/internal/prompt"
 	"github.com/posit-dev/pev/internal/report"
 )
+
+// isTerminal returns true when the given file looks like an interactive TTY
+// for ANSI colour purposes. NO_COLOR (https://no-color.org/) is honored.
+func isTerminal(f *os.File) bool {
+	if os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+	return term.IsTerminal(int(f.Fd()))
+}
 
 func newAssessCmd() *cobra.Command {
 	var (
@@ -30,11 +40,9 @@ func newAssessCmd() *cobra.Command {
 		hostnames      []string
 		idp            string
 		outputs        []string
-		severityMin    string
 		tagsAny        []string
 		skipTags       []string
 		skipChecks     []string
-		noCmdLog       bool
 	)
 	c := &cobra.Command{
 		Use:   "assess",
@@ -68,13 +76,15 @@ func newAssessCmd() *cobra.Command {
 			facts := discover.Gather(ctx)
 			log.WithField("facts", facts).Debug("discovery complete")
 
-			// Resolve selected products.
+			// Resolve selected products. Order of precedence:
+			//   1. --products flag (explicit user override)
+			//   2. --profile flag preset
+			//   3. Auto-detect from rstudio-* binaries (DetectProducts)
+			//   4. Multi-select prompt — only fires when nothing was detected
+			//      and the user did not pass --products / --profile
 			selected := discover.SelectedFromFlag(products, facts.Products)
 			if profile != "" && len(selected) == 0 {
 				selected = profileToProducts(profile)
-			}
-			if len(selected) == 0 {
-				selected = []string{"workbench", "connect", "packagemanager"}
 			}
 
 			// Pick the prompt mode from CLI flags. --non-interactive wins
@@ -89,6 +99,30 @@ func newAssessCmd() *cobra.Command {
 				mode = prompt.ModeYes
 			}
 			driver := prompt.New(mode)
+
+			if len(selected) == 0 {
+				// "no products" is preselected and is the safe default:
+				// it runs OS / networking / security / sizing /
+				// languages / package-manager health and skips every
+				// product-scoped check. SEs deliberately tick a real
+				// product to enable cert/SMTP/PPM-sync prompts. Ctrl+C
+				// or Esc on the survey aborts with err=ErrSkipped from
+				// the driver, which we treat as "stick with the default."
+				const noneOption = "no products - common system checks only"
+				picks, _ := driver.MultiSelect(
+					"Which Posit products will run on this host?",
+					[]string{noneOption, "workbench", "connect", "packagemanager"},
+					[]string{noneOption},
+				)
+				selected = filterNoneOption(picks, noneOption)
+				if len(selected) == 0 {
+					// Sentinel: no real check uses applies_to.products: [none],
+					// so the catalog filter at internal/checks/filter.go drops
+					// every product-scoped check and only common checks survive.
+					selected = []string{"none"}
+				}
+			}
+
 			inputs := buildInputs(licenseFile, hostnames, idp, facts, selected, driver)
 
 			// Load catalog.
@@ -109,25 +143,24 @@ func newAssessCmd() *cobra.Command {
 				return fmt.Errorf("catalog has %d lint error(s); run `pev lint-checks` for details", len(errs))
 			}
 
-			// Filter for selected products + tags + severity.
+			// Filter for selected products + tags.
 			f := checks.Filter{
-				Products:    selected,
-				Tags:        tagsAny,
-				SkipTags:    skipTags,
-				SkipIDs:     skipChecks,
-				SeverityMin: checks.Severity(severityMin),
+				Products: selected,
+				Tags:     tagsAny,
+				SkipTags: skipTags,
+				SkipIDs:  skipChecks,
 			}
 			filtered := f.Apply(all)
 
-			// cmdlog
-			cl, err := logging.NewCmdLog(outDir, facts.Hostname, !noCmdLog)
-			if err != nil {
-				return err
+			// Engine. Progress lines emitted to stderr by the engine
+			// itself (see checks.Engine.Run) so users see something
+			// happening during long-running checks like apt update or
+			// uv venv creation.
+			eng := checks.Engine{
+				Facts:    facts,
+				Inputs:   inputs,
+				Progress: os.Stderr,
 			}
-			defer cl.Close()
-
-			// Engine.
-			eng := checks.Engine{Facts: facts, Inputs: inputs, CmdLog: cl}
 			results := eng.Run(ctx, filtered)
 
 			finished := time.Now()
@@ -138,7 +171,7 @@ func newAssessCmd() *cobra.Command {
 				Run: checks.Run{
 					Products: selected,
 					Profile:  profile,
-					Inputs:   inputs,
+					Inputs:   redactSecrets(inputs),
 				},
 				StartedAt:  started,
 				FinishedAt: finished,
@@ -165,13 +198,15 @@ func newAssessCmd() *cobra.Command {
 				fmt.Println(p)
 			}
 
-			// Always print the Markdown to screen so an SE running on a customer box
-			// gets immediate feedback even if they forgot to look in --out-dir.
+			// Always print a human-facing summary on stdout. The terminal
+			// view shows totals and only failing/unknown checks (grouped
+			// by category). The full per-check audit trail — including
+			// PASS and SKIP — lives in the on-disk Markdown report.
 			fmt.Println()
-			fmt.Println(report.RenderMarkdown(rep))
+			report.RenderTerminal(os.Stdout, rep, isTerminal(os.Stdout))
 
-			if rep.Summary.Blocking > 0 {
-				return fmt.Errorf("%d blocking failure(s) — see report", rep.Summary.Blocking)
+			if rep.Summary.Fail > 0 {
+				return fmt.Errorf("%d failure(s) — see report", rep.Summary.Fail)
 			}
 			return nil
 		},
@@ -186,11 +221,9 @@ func newAssessCmd() *cobra.Command {
 	c.Flags().StringSliceVar(&hostnames, "hostnames", nil, "comma-separated key=value pairs: workbench=...,connect=...,ppm=...")
 	c.Flags().StringVar(&idp, "idp", "", "identity provider: ldap|saml|oidc|none")
 	c.Flags().StringSliceVar(&outputs, "output", []string{"md", "json"}, "comma-separated outputs to write: md,json")
-	c.Flags().StringVar(&severityMin, "severity-min", "", "drop checks below this severity (info|warning|blocking)")
 	c.Flags().StringSliceVar(&tagsAny, "tags", nil, "only run checks tagged with ALL of these")
 	c.Flags().StringSliceVar(&skipTags, "skip-tags", nil, "skip checks tagged with any of these")
 	c.Flags().StringSliceVar(&skipChecks, "skip-checks", nil, "skip checks by ID")
-	c.Flags().BoolVar(&noCmdLog, "no-cmdlog", false, "do not write the replayable shell command log")
 	return c
 }
 
@@ -214,7 +247,8 @@ func profileToProducts(profile string) []string {
 }
 
 // buildInputs collects every input the catalog references: per-product
-// hostname/cert/key paths, IdP metadata URL, SMTP host, license file path.
+// hostname/cert/key paths, IdP metadata URL, SMTP host, license file path,
+// and the unprivileged user name pev drives renv/uv/pip checks under.
 // Order of precedence: explicit CLI flag > prompt answer > discovered default.
 // The prompt driver decides at runtime whether to actually show a TUI prompt
 // (interactive), silently take the discovered default (yes / non-interactive),
@@ -227,89 +261,331 @@ func buildInputs(
 	selected []string,
 	d prompt.Driver,
 ) map[string]string {
-	in := map[string]string{}
+	// Pre-seed every catalog-referenced key with the empty string so the
+	// engine's `missingkey=error` template option doesn't trip on a YAML
+	// `{{ if .Inputs.foo }}` guard for an input the SE didn't supply.
+	// Add new keys here when you add a new YAML reference to .Inputs.X.
+	in := map[string]string{
+		"license_file":       "",
+		"unprivileged_user":  "",
+		"workbench_hostname": "", "workbench_cert": "", "workbench_key": "",
+		"connect_hostname": "", "connect_cert": "", "connect_key": "",
+		"ppm_hostname": "", "ppm_cert": "", "ppm_key": "",
+		"idp": "none", "idp_metadata_url": "",
+		"connect_smtp_host": "",
+		"home_share_path":   "",
+		"pam_test_user":     "",
+		"use_pro_drivers":   "no",
+		"postgres_host":     "",
+		"postgres_port":     "5432",
+	}
 	if licenseFile != "" {
 		in["license_file"] = licenseFile
 	}
+	in["unprivileged_user"] = resolveUnprivilegedUser(d)
 
 	defaultHost := facts.FQDN
 	if defaultHost == "" {
 		defaultHost = facts.Hostname
 	}
-
-	// Per-product hostname: flag wins; otherwise use the host's FQDN as the
-	// prompt default. Customers running a multi-host install will override.
-	hostnameOverrides := map[string]string{}
-	for _, kv := range hostnamePairs {
-		k, v, ok := strings.Cut(kv, "=")
-		if !ok || v == "" {
+	hostnameOverrides := parseHostnamePairs(hostnamePairs)
+	wanted := selectionToWanted(selected)
+	for _, p := range productPrompts() {
+		if !wanted[p.key] {
 			continue
 		}
-		hostnameOverrides[strings.TrimSpace(k)] = strings.TrimSpace(v)
+		promptProductInputs(d, p, in, hostnameOverrides, defaultHost)
 	}
 
-	type productPrompt struct{ key, label, defaultCert, defaultKey string }
-	products := []productPrompt{
+	if wanted["workbench"] {
+		promptIdP(d, idp, in)
+	}
+	if wanted["connect"] {
+		promptSMTP(d, in)
+	}
+	promptPostgres(d, in)
+	promptPAM(d, in)
+	promptProDrivers(d, in)
+	promptHomeShare(d, in)
+	return in
+}
+
+// promptIdP collects the SSO/IdP metadata URL when Workbench is selected.
+// --idp on the CLI bypasses the opt-in confirm prompt; idp="none" forces
+// SKIP. Otherwise the SE picks SAML or OIDC at the prompt.
+func promptIdP(d prompt.Driver, idp string, in map[string]string) {
+	switch {
+	case idp != "" && idp != "none":
+		def := defaultIdPMetadataURL(idp)
+		got, _ := d.Input("IdP metadata or discovery URL (or 'skip'):", def)
+		in["idp"] = idp
+		if got != "" {
+			in["idp_metadata_url"] = got
+		}
+	case idp == "none":
+		in["idp"] = "none"
+	default:
+		ssoWant, _ := d.Confirm("Check Workbench SSO/IdP metadata reachability?", false)
+		if !ssoWant {
+			in["idp"] = "none"
+			return
+		}
+		picked, _ := d.Select("Identity provider type:", []string{"saml", "oidc"}, "saml")
+		got, _ := d.Input("IdP metadata or discovery URL (or 'skip'):", defaultIdPMetadataURL(picked))
+		in["idp"] = picked
+		if got != "" {
+			in["idp_metadata_url"] = got
+		}
+	}
+}
+
+// promptSMTP collects the Connect outbound SMTP host. Opt-in, default NO.
+// SMTP-reachability is the noisiest false positive on lab hosts where
+// outbound 25/587/465 is firewalled by design.
+func promptSMTP(d prompt.Driver, in map[string]string) {
+	smtpWant, _ := d.Confirm("Check Connect outbound SMTP reachability?", false)
+	if !smtpWant {
+		return
+	}
+	got, _ := d.Input("Outbound SMTP host for Connect:", "smtp.example.com")
+	in["connect_smtp_host"] = got
+}
+
+// promptPostgres collects host/port/db/user/password for an external
+// Postgres deployment. We probe network reachability only; SQL
+// auth/role/schema validation is the install's job. The password is
+// held in memory only — redactSecrets strips it before the inputs map
+// lands on disk.
+func promptPostgres(d prompt.Driver, in map[string]string) {
+	pgWant, _ := d.Confirm("Will this deployment use an external PostgreSQL database?", false)
+	if !pgWant {
+		return
+	}
+	host, _ := d.Input("PostgreSQL host:", "")
+	if host == "" {
+		return
+	}
+	in["postgres_host"] = host
+	port, _ := d.Input("PostgreSQL port:", "5432")
+	in["postgres_port"] = port
+	if db, _ := d.Input("PostgreSQL database name:", ""); db != "" {
+		in["postgres_database"] = db
+	}
+	if user, _ := d.Input("PostgreSQL username:", ""); user != "" {
+		in["postgres_user"] = user
+	}
+	if pw, _ := d.Password("PostgreSQL password (input hidden):"); pw != "" {
+		in["postgres_password"] = pw
+	}
+}
+
+// promptPAM collects a customer-supplied PAM/SSO test username. Opt-in.
+// Catches AD/LDAP/SSSD wired to Workbench PAM that doesn't actually
+// resolve through nsswitch.
+func promptPAM(d prompt.Driver, in map[string]string) {
+	want, _ := d.Confirm("Validate that an SSO/AD test user resolves through PAM/NSS?", false)
+	if !want {
+		return
+	}
+	got, _ := d.Input("Test username (must already exist in your IdP):", "")
+	if got != "" {
+		in["pam_test_user"] = got
+	}
+}
+
+// promptProDrivers sets a flag indicating Posit Pro Drivers presence
+// should be checked. Default NO.
+func promptProDrivers(d prompt.Driver, in map[string]string) {
+	if want, _ := d.Confirm("Will this deployment use Posit Pro Drivers (rstudio-drivers)?", false); want {
+		in["use_pro_drivers"] = "yes"
+	}
+}
+
+// promptHomeShare collects the local mountpoint of a customer NFS-backed
+// home share when one is in use. Default NO.
+func promptHomeShare(d prompt.Driver, in map[string]string) {
+	want, _ := d.Confirm("Will home directory be mounted on an NFS share?", false)
+	if !want {
+		return
+	}
+	got, _ := d.Input("NFS-backed home share mountpoint (the local path, e.g. /home):", "/home")
+	if got != "" {
+		in["home_share_path"] = got
+	}
+}
+
+// secretInputKeys lists the input keys that must NEVER land in the JSON
+// report or the pev-log. New secret-shaped inputs go here.
+var secretInputKeys = map[string]struct{}{
+	"postgres_password": {},
+}
+
+// redactSecrets returns a copy of in with secret values replaced by
+// "(redacted)". The original map keeps the secret because the engine
+// still needs it to render template values for the live check (e.g. a
+// future postgres primitive that issues a real query). We never persist
+// the raw value.
+func redactSecrets(in map[string]string) map[string]string {
+	out := make(map[string]string, len(in))
+	for k, v := range in {
+		if _, isSecret := secretInputKeys[k]; isSecret && v != "" {
+			out[k] = "(redacted)"
+			continue
+		}
+		out[k] = v
+	}
+	return out
+}
+
+// filterNoneOption strips the "no products" sentinel from a multi-select
+// result. If the sentinel was picked alongside a real product, the
+// sentinel wins — explicit "no products" beats accidental ticks. Returns
+// nil to signal common-only.
+func filterNoneOption(picks []string, sentinel string) []string {
+	out := make([]string, 0, len(picks))
+	for _, p := range picks {
+		if p == sentinel {
+			return nil
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+type productPrompt struct{ key, label, defaultCert, defaultKey string }
+
+func productPrompts() []productPrompt {
+	return []productPrompt{
 		{"workbench", "Workbench", "/etc/rstudio/workbench.crt", "/etc/rstudio/workbench.key"},
 		{"connect", "Connect", "/etc/rstudio-connect/connect.crt", "/etc/rstudio-connect/connect.key"},
 		{"ppm", "Package Manager", "/etc/rstudio-pm/pm.crt", "/etc/rstudio-pm/pm.key"},
 	}
-	wanted := map[string]bool{}
-	for _, s := range selected {
-		// catalog uses "packagemanager" but flag/input keys use "ppm".
-		switch s {
-		case "packagemanager":
-			wanted["ppm"] = true
-		default:
-			wanted[s] = true
-		}
-	}
+}
 
-	for _, p := range products {
-		if !wanted[p.key] {
+// resolveUnprivilegedUser picks the user pev should run renv/uv/pip
+// checks as. When the running process is already non-root, that user is
+// authoritative. When running as root, prompt with the first /etc/passwd
+// human user as the default.
+func resolveUnprivilegedUser(d prompt.Driver) string {
+	if cu := discover.CurrentNonRootUser(); cu != "" {
+		return cu
+	}
+	def := discover.FirstHumanUser()
+	got, _ := d.Input("Unprivileged user to run renv/uv/pip checks as:", def)
+	return got
+}
+
+func parseHostnamePairs(pairs []string) map[string]string {
+	out := map[string]string{}
+	for _, kv := range pairs {
+		k, v, ok := strings.Cut(kv, "=")
+		if !ok || v == "" {
 			continue
 		}
-		// Hostname.
-		def := defaultHost
-		if v, ok := hostnameOverrides[p.key]; ok {
-			def = v
+		out[strings.TrimSpace(k)] = strings.TrimSpace(v)
+	}
+	return out
+}
+
+func selectionToWanted(selected []string) map[string]bool {
+	w := map[string]bool{}
+	for _, s := range selected {
+		// Catalog uses "packagemanager" but flag/input keys use "ppm".
+		switch s {
+		case "packagemanager":
+			w["ppm"] = true
+		default:
+			w[s] = true
 		}
-		got, _ := d.Input(p.label+" public hostname:", def)
-		in[p.key+"_hostname"] = got
-
-		// Cert + key. Skip-prompted by typing "skip" in interactive mode
-		// (handled inside prompt.ErrSkipped), which leaves the input empty
-		// and SKIPs the dependent x509 checks.
-		certPath, _ := d.Input(p.label+" SSL cert path (or 'skip'):", p.defaultCert)
-		in[p.key+"_cert"] = certPath
-		keyPath, _ := d.Input(p.label+" SSL key path (or 'skip'):", p.defaultKey)
-		in[p.key+"_key"] = keyPath
 	}
+	return w
+}
 
-	// IdP type + metadata URL.
-	if idp == "" {
-		idp, _ = d.Select("Identity provider for Workbench/Connect:", []string{"none", "saml", "oidc", "ldap"}, "none")
+// promptProductInputs collects hostname + (opt-in) cert/key for one
+// product, writing answers into `in`.
+func promptProductInputs(d prompt.Driver, p productPrompt, in map[string]string, overrides map[string]string, defaultHost string) {
+	def := defaultHost
+	if v, ok := overrides[p.key]; ok {
+		def = v
 	}
-	in["idp"] = idp
-	if wanted["workbench"] && idp != "none" && idp != "" {
-		def := ""
-		switch idp {
-		case "saml":
-			def = "https://idp.example.com/saml/metadata"
-		case "oidc":
-			def = "https://idp.example.com/.well-known/openid-configuration"
-		}
-		got, _ := d.Input("IdP metadata or discovery URL (or 'skip'):", def)
-		in["idp_metadata_url"] = got
-	}
+	got, _ := d.Input(p.label+" public hostname:", def)
+	in[p.key+"_hostname"] = got
 
-	// SMTP host for Connect.
-	if wanted["connect"] {
-		got, _ := d.Input("Outbound SMTP host for Connect (or 'skip'):", "smtp.example.com")
-		in["connect_smtp_host"] = got
+	// Cert + key — opt-in to keep the system-check fast path clear.
+	// Default is NO (yes / non-interactive accepts the default). When
+	// the user opts in we offer a dropdown of candidates discovered
+	// inside the product config dir, falling back to a free-form path
+	// prompt if nothing was discovered. Once a cert is chosen the
+	// matching key prompt is REQUIRED — the x509 primitive needs both
+	// halves to verify pairing.
+	want, _ := d.Confirm("Check "+p.label+" SSL certificate?", false)
+	if !want {
+		return
 	}
+	cands := discover.ScanSSLCandidates(p.key)
+	certPath := promptPath(d, p.label+" SSL cert", cands.Certs, p.defaultCert)
+	if certPath == "" {
+		return
+	}
+	in[p.key+"_cert"] = certPath
+	in[p.key+"_key"] = promptPathRequired(d, p.label+" SSL key", cands.Keys, p.defaultKey)
+}
 
-	return in
+func defaultIdPMetadataURL(kind string) string {
+	switch kind {
+	case "saml":
+		return "https://idp.example.com/saml/metadata"
+	case "oidc":
+		return "https://idp.example.com/.well-known/openid-configuration"
+	}
+	return ""
+}
+
+// promptPath shows a Select dropdown of discovered cert/key candidates plus
+// "(custom path)" and "(skip)" sentinels. Returns the chosen path, or "" to
+// trigger a SKIP downstream. Falls through to a plain Input prompt when no
+// candidates were discovered.
+func promptPath(d prompt.Driver, label string, candidates []string, fallback string) string {
+	const (
+		customSentinel = "(custom path)"
+		skipSentinel   = "(skip)"
+	)
+	if len(candidates) == 0 {
+		got, _ := d.Input(label+" path (or 'skip'):", fallback)
+		return got
+	}
+	options := append([]string{}, candidates...)
+	options = append(options, customSentinel, skipSentinel)
+	pick, _ := d.Select(label+" path:", options, candidates[0])
+	switch pick {
+	case skipSentinel:
+		return ""
+	case customSentinel:
+		got, _ := d.Input(label+" path (or 'skip'):", fallback)
+		return got
+	}
+	return pick
+}
+
+// promptPathRequired is promptPath without the (skip) sentinel — used for
+// the second half of a cert/key pair so an SE who entered a cert can't
+// half-configure the prompt by skipping the key. The primitive can't
+// verify pairing without both halves, so returning "" here would just
+// waste the cert path the user already entered.
+func promptPathRequired(d prompt.Driver, label string, candidates []string, fallback string) string {
+	const customSentinel = "(custom path)"
+	if len(candidates) == 0 {
+		got, _ := d.Input(label+" path:", fallback)
+		return got
+	}
+	options := append([]string{}, candidates...)
+	options = append(options, customSentinel)
+	pick, _ := d.Select(label+" path:", options, candidates[0])
+	if pick == customSentinel {
+		got, _ := d.Input(label+" path:", fallback)
+		return got
+	}
+	return pick
 }
 
 func wantOutputs(out []string) (md, j bool) {

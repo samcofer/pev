@@ -26,7 +26,7 @@ func runDir(rc checks.RunCtx) checks.Result {
 
 	st, err := os.Stat(path)
 	r := checks.Result{
-		ID: rc.Check.ID, Title: rc.Check.Title, Severity: rc.Check.Severity,
+		ID: rc.Check.ID, Title: rc.Check.Title,
 		Evidence: []checks.Evidence{{Path: path}},
 	}
 	if err != nil {

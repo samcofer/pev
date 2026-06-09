@@ -33,13 +33,11 @@ func runPort(rc checks.RunCtx) checks.Result {
 
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
 	r := checks.Result{
-		ID: rc.Check.ID, Title: rc.Check.Title, Severity: rc.Check.Severity,
+		ID: rc.Check.ID, Title: rc.Check.Title,
 		Evidence: []checks.Evidence{{
 			Note: fmt.Sprintf("nc -vz %s %d (timeout %s)", host, port, timeout),
 		}},
 	}
-	rc.CmdLog.Append(fmt.Sprintf("nc -vz %s %d", host, port))
-
 	d := net.Dialer{Timeout: timeout}
 	conn, err := d.DialContext(rc.Ctx, "tcp", addr)
 	if err != nil {

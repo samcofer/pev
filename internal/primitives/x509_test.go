@@ -56,7 +56,7 @@ func TestX509CertKeyPairing(t *testing.T) {
 	_, keyB := makeCertKey(t, "host.example.com", time.Now().Add(365*24*time.Hour))
 
 	pass := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityInfo, Primitive: "x509",
+		ID: "x", Title: "x", Primitive: "x509",
 		With: map[string]interface{}{"cert_path": certA, "key_path": keyA, "match_hostname": "host.example.com", "not_after_min_days": 30},
 	}
 	if r := runRC(t, pass, discover.HostFacts{}); r.Status != checks.StatusPass {
@@ -64,7 +64,7 @@ func TestX509CertKeyPairing(t *testing.T) {
 	}
 
 	mismatch := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityInfo, Primitive: "x509",
+		ID: "x", Title: "x", Primitive: "x509",
 		With: map[string]interface{}{"cert_path": certA, "key_path": keyB},
 	}
 	r := runRC(t, mismatch, discover.HostFacts{})
@@ -76,7 +76,7 @@ func TestX509CertKeyPairing(t *testing.T) {
 func TestX509HostnameMismatch(t *testing.T) {
 	cert, key := makeCertKey(t, "host.example.com", time.Now().Add(365*24*time.Hour))
 	c := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityInfo, Primitive: "x509",
+		ID: "x", Title: "x", Primitive: "x509",
 		With: map[string]interface{}{"cert_path": cert, "key_path": key, "match_hostname": "other.example.com"},
 	}
 	r := runRC(t, c, discover.HostFacts{})
@@ -89,7 +89,7 @@ func TestX509ExpirationCushion(t *testing.T) {
 	// Cert expires in 5 days; the check requires at least 30.
 	cert, key := makeCertKey(t, "host.example.com", time.Now().Add(5*24*time.Hour))
 	c := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityInfo, Primitive: "x509",
+		ID: "x", Title: "x", Primitive: "x509",
 		With: map[string]interface{}{"cert_path": cert, "key_path": key, "not_after_min_days": 30},
 	}
 	r := runRC(t, c, discover.HostFacts{})

@@ -1,8 +1,7 @@
-schema_version: 1
+schema_version: 2
 checks:
   - id: ppm.egress.sync
     title: Package Manager can reach the Posit Package Service
-    severity: blocking
     tags: [network, egress, packagemanager]
     applies_to:
       products: [packagemanager]

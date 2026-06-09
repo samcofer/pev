@@ -9,13 +9,11 @@ import (
 
 	"github.com/posit-dev/pev/internal/checks"
 	"github.com/posit-dev/pev/internal/discover"
-	"github.com/posit-dev/pev/internal/logging"
 )
 
 func runRC(t *testing.T, c checks.Check, facts discover.HostFacts) checks.Result {
 	t.Helper()
-	cl, _ := logging.NewCmdLog("", "host", false) // no-op
-	rc := checks.RunCtx{Ctx: context.Background(), Check: c, Facts: facts, CmdLog: cl}
+	rc := checks.RunCtx{Ctx: context.Background(), Check: c, Facts: facts}
 	r, err := checks.Lookup(c.Primitive)
 	if err != nil {
 		t.Fatal(err)
@@ -25,14 +23,14 @@ func runRC(t *testing.T, c checks.Check, facts discover.HostFacts) checks.Result
 
 func TestCmdPrimitivePassFail(t *testing.T) {
 	pass := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityInfo, Primitive: "cmd",
+		ID: "x", Title: "x", Primitive: "cmd",
 		With: map[string]interface{}{"cmd": "true", "expect_exit": 0},
 	}
 	if r := runRC(t, pass, discover.HostFacts{}); r.Status != checks.StatusPass {
 		t.Fatalf("expected pass, got %s/%s", r.Status, r.Reason)
 	}
 	fail := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityInfo, Primitive: "cmd",
+		ID: "x", Title: "x", Primitive: "cmd",
 		With: map[string]interface{}{"cmd": "false", "expect_exit": 0},
 	}
 	if r := runRC(t, fail, discover.HostFacts{}); r.Status != checks.StatusFail {
@@ -46,7 +44,7 @@ func TestFilePrimitiveExistence(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityInfo, Primitive: "file",
+		ID: "x", Title: "x", Primitive: "file",
 		With: map[string]interface{}{"path": tmp, "must_exist": true, "contains_regex": "(?m)^ssl-enabled=1"},
 	}
 	if r := runRC(t, c, discover.HostFacts{}); r.Status != checks.StatusPass {
@@ -54,7 +52,7 @@ func TestFilePrimitiveExistence(t *testing.T) {
 	}
 
 	missing := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityInfo, Primitive: "file",
+		ID: "x", Title: "x", Primitive: "file",
 		With: map[string]interface{}{"path": "/nonexistent/path"},
 	}
 	if r := runRC(t, missing, discover.HostFacts{}); r.Status != checks.StatusFail {
@@ -64,7 +62,7 @@ func TestFilePrimitiveExistence(t *testing.T) {
 
 func TestSizingPrimitive(t *testing.T) {
 	pass := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityWarning, Primitive: "sizing",
+		ID: "x", Title: "x", Primitive: "sizing",
 		With: map[string]interface{}{"cpus_min": 1, "mem_gb_min": 1, "disk_gb_min": map[string]interface{}{"/": 0}},
 	}
 	r := runRC(t, pass, discover.HostFacts{CPUs: 4, MemMB: 8192, DiskGB: map[string]int{"/": 100}})
@@ -72,7 +70,7 @@ func TestSizingPrimitive(t *testing.T) {
 		t.Fatalf("expected pass, got %s/%s", r.Status, r.Reason)
 	}
 	fail := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityWarning, Primitive: "sizing",
+		ID: "x", Title: "x", Primitive: "sizing",
 		With: map[string]interface{}{"cpus_min": 100},
 	}
 	r = runRC(t, fail, discover.HostFacts{CPUs: 4, MemMB: 8192, DiskGB: map[string]int{"/": 100}})

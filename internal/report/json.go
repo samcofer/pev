@@ -45,7 +45,7 @@ func ReadJSON(path string) (checks.Report, error) {
 	return rep, nil
 }
 
-// Summarize tallies a Result list into a Summary, mutating Severity counts.
+// Summarize tallies a Result list into a Summary.
 func Summarize(results []checks.Result) checks.Summary {
 	s := checks.Summary{Total: len(results)}
 	for _, r := range results {
@@ -54,9 +54,6 @@ func Summarize(results []checks.Result) checks.Summary {
 			s.Pass++
 		case checks.StatusFail:
 			s.Fail++
-			if r.Severity == checks.SeverityBlocking {
-				s.Blocking++
-			}
 		case checks.StatusSkip:
 			s.Skip++
 		case checks.StatusUnknown:

@@ -30,15 +30,14 @@ type Header struct {
 
 // DiffEntry is one row in any of the diff classifications.
 type DiffEntry struct {
-	ID          string          `json:"id"`
-	Title       string          `json:"title"`
-	Severity    checks.Severity `json:"severity"`
-	WasStatus   checks.Status   `json:"was_status,omitempty"`
-	NowStatus   checks.Status   `json:"now_status,omitempty"`
-	WasReason   string          `json:"was_reason,omitempty"`
-	NowReason   string          `json:"now_reason,omitempty"`
-	WasEvidence string          `json:"was_evidence,omitempty"`
-	NowEvidence string          `json:"now_evidence,omitempty"`
+	ID          string        `json:"id"`
+	Title       string        `json:"title"`
+	WasStatus   checks.Status `json:"was_status,omitempty"`
+	NowStatus   checks.Status `json:"now_status,omitempty"`
+	WasReason   string        `json:"was_reason,omitempty"`
+	NowReason   string        `json:"now_reason,omitempty"`
+	WasEvidence string        `json:"was_evidence,omitempty"`
+	NowEvidence string        `json:"now_evidence,omitempty"`
 }
 
 // Compute returns a Diff comparing baseline (a) against current (b).
@@ -96,7 +95,7 @@ func indexBy(rs []checks.Result) map[string]checks.Result {
 
 func entryDelta(a, b checks.Result) DiffEntry {
 	return DiffEntry{
-		ID: b.ID, Title: b.Title, Severity: b.Severity,
+		ID: b.ID, Title: b.Title,
 		WasStatus: a.Status, NowStatus: b.Status,
 		WasReason: a.Reason, NowReason: b.Reason,
 		WasEvidence: evidenceSummary(a), NowEvidence: evidenceSummary(b),
@@ -104,11 +103,11 @@ func entryDelta(a, b checks.Result) DiffEntry {
 }
 
 func entryNow(b checks.Result) DiffEntry {
-	return DiffEntry{ID: b.ID, Title: b.Title, Severity: b.Severity, NowStatus: b.Status, NowReason: b.Reason, NowEvidence: evidenceSummary(b)}
+	return DiffEntry{ID: b.ID, Title: b.Title, NowStatus: b.Status, NowReason: b.Reason, NowEvidence: evidenceSummary(b)}
 }
 
 func entryWas(a checks.Result) DiffEntry {
-	return DiffEntry{ID: a.ID, Title: a.Title, Severity: a.Severity, WasStatus: a.Status, WasReason: a.Reason, WasEvidence: evidenceSummary(a)}
+	return DiffEntry{ID: a.ID, Title: a.Title, WasStatus: a.Status, WasReason: a.Reason, WasEvidence: evidenceSummary(a)}
 }
 
 func evidenceDiffers(a, b checks.Result) bool {
@@ -145,7 +144,7 @@ func RenderDiffMarkdown(d Diff) string {
 			if r.WasStatus != "" && r.NowStatus != "" {
 				arrow = fmt.Sprintf(" — was %s, now %s", strings.ToUpper(string(r.WasStatus)), strings.ToUpper(string(r.NowStatus)))
 			}
-			fmt.Fprintf(&b, "- %s `%s` (%s)%s\n", icon, r.ID, r.Severity, arrow)
+			fmt.Fprintf(&b, "- %s `%s`%s\n", icon, r.ID, arrow)
 			fmt.Fprintf(&b, "  - %s\n", r.Title)
 			if r.WasReason != r.NowReason {
 				if r.WasReason != "" {

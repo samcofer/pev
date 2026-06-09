@@ -10,7 +10,7 @@ import (
 
 func TestDNSPrimitiveLocalhost(t *testing.T) {
 	c := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityInfo, Primitive: "dns",
+		ID: "x", Title: "x", Primitive: "dns",
 		With: map[string]interface{}{"name": "localhost", "must_resolve": true, "timeout_seconds": 2},
 	}
 	if r := runRC(t, c, discover.HostFacts{}); r.Status != checks.StatusPass {
@@ -20,7 +20,7 @@ func TestDNSPrimitiveLocalhost(t *testing.T) {
 
 func TestDNSPrimitiveBogusName(t *testing.T) {
 	c := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityInfo, Primitive: "dns",
+		ID: "x", Title: "x", Primitive: "dns",
 		With: map[string]interface{}{
 			"name":            "this-name-should-never-resolve.invalid.",
 			"must_resolve":    true,

@@ -1,8 +1,8 @@
-schema_version: 1
+schema_version: 2
 checks:
   - id: workbench.ssl.cert-key-match
     title: Workbench SSL certificate and key are paired
-    severity: blocking
+    category: SSL/TLS
     tags: [ssl, workbench]
     applies_to:
       products: [workbench]

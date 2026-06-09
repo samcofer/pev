@@ -24,11 +24,6 @@ func Lint(checks []Check) []error {
 		if c.Why == "" {
 			errs = append(errs, fmt.Errorf("%s missing why (rationale shown to users)", prefix))
 		}
-		switch c.Severity {
-		case SeverityBlocking, SeverityWarning, SeverityInfo:
-		default:
-			errs = append(errs, fmt.Errorf("%s invalid severity %q (want blocking|warning|info)", prefix, c.Severity))
-		}
 		if prev, dup := seen[c.ID]; dup {
 			errs = append(errs, fmt.Errorf("%s duplicate id (also in %s)", prefix, prev))
 		} else if c.ID != "" {

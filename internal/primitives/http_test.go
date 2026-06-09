@@ -16,7 +16,7 @@ func TestHTTPPrimitive(t *testing.T) {
 	defer srv500.Close()
 
 	pass := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityInfo, Primitive: "http",
+		ID: "x", Title: "x", Primitive: "http",
 		With: map[string]interface{}{"url": srv200.URL, "timeout_seconds": 2},
 	}
 	if r := runRC(t, pass, discover.HostFacts{}); r.Status != checks.StatusPass {
@@ -24,7 +24,7 @@ func TestHTTPPrimitive(t *testing.T) {
 	}
 
 	fail := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityInfo, Primitive: "http",
+		ID: "x", Title: "x", Primitive: "http",
 		With: map[string]interface{}{"url": srv500.URL, "timeout_seconds": 2},
 	}
 	if r := runRC(t, fail, discover.HostFacts{}); r.Status != checks.StatusFail {
@@ -33,7 +33,7 @@ func TestHTTPPrimitive(t *testing.T) {
 
 	// Connection refused — no listener.
 	dead := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityInfo, Primitive: "http",
+		ID: "x", Title: "x", Primitive: "http",
 		With: map[string]interface{}{"url": "http://127.0.0.1:1", "timeout_seconds": 2},
 	}
 	if r := runRC(t, dead, discover.HostFacts{}); r.Status != checks.StatusFail {
@@ -45,7 +45,7 @@ func TestHTTPAcceptStatus(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(404) }))
 	defer srv.Close()
 	c := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityInfo, Primitive: "http",
+		ID: "x", Title: "x", Primitive: "http",
 		With: map[string]interface{}{
 			"url":             srv.URL,
 			"timeout_seconds": 2,

@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"sort"
 	"text/template"
 	"time"
 
 	"github.com/posit-dev/pev/internal/discover"
-	"github.com/posit-dev/pev/internal/logging"
 	"github.com/posit-dev/pev/internal/system"
 )
 
@@ -17,7 +17,13 @@ import (
 type Engine struct {
 	Facts  discover.HostFacts
 	Inputs map[string]string
-	CmdLog *logging.CmdLog
+
+	// Progress, when non-nil, receives one line per check as it runs.
+	// Format: "[i/N] running <id> ...". Useful for stderr output during
+	// long-running primitives (apt update, uv venv, renv install) so the
+	// SE knows pev hasn't hung. Final per-check status is NOT emitted —
+	// that lives in the report.
+	Progress io.Writer
 }
 
 // Run filters checks by AppliesTo, gates root-only checks, expands templates
@@ -25,7 +31,10 @@ type Engine struct {
 // sorted by ID.
 func (e *Engine) Run(ctx context.Context, all []Check) []Result {
 	out := make([]Result, 0, len(all))
-	for _, c := range all {
+	for i, c := range all {
+		if e.Progress != nil {
+			fmt.Fprintf(e.Progress, "[%d/%d] %s\n", i+1, len(all), c.ID)
+		}
 		out = append(out, e.runOne(ctx, c))
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
@@ -35,7 +44,7 @@ func (e *Engine) Run(ctx context.Context, all []Check) []Result {
 func (e *Engine) runOne(ctx context.Context, c Check) Result {
 	start := time.Now()
 	base := Result{
-		ID: c.ID, Title: c.Title, Severity: c.Severity,
+		ID: c.ID, Title: c.Title,
 		Why: c.Why, References: c.References,
 	}
 	finish := func(r Result) Result {
@@ -46,6 +55,11 @@ func (e *Engine) runOne(ctx context.Context, c Check) Result {
 	if !appliesTo(c.AppliesTo, e.Facts) {
 		base.Status = StatusSkip
 		base.Reason = "does not apply to this host"
+		return finish(base)
+	}
+	if missing := missingRequires(c.AppliesTo.Requires, e.Facts); missing != "" {
+		base.Status = StatusSkip
+		base.Reason = "missing required tooling: " + missing
 		return finish(base)
 	}
 	if c.RequiresRoot && !system.IsRoot() {
@@ -70,13 +84,16 @@ func (e *Engine) runOne(ctx context.Context, c Check) Result {
 	}
 
 	r := runner(RunCtx{
-		Ctx: ctx, Check: c, Facts: e.Facts, Inputs: e.Inputs, CmdLog: e.CmdLog,
+		Ctx: ctx, Check: c, Facts: e.Facts, Inputs: e.Inputs,
 	})
 	r.ID = c.ID
 	r.Title = c.Title
-	r.Severity = c.Severity
+	r.Category = CategoryFor(c)
 	r.Why = c.Why
 	r.References = c.References
+	if r.Status == StatusFail || r.Status == StatusUnknown {
+		r.Remediation = c.Remediation
+	}
 	return finish(r)
 }
 
@@ -123,6 +140,46 @@ func contains(set []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// missingRequires returns the first required-fact token that the host
+// doesn't satisfy, or "" when every requirement is met. Unknown tokens
+// are treated as a satisfied fact so adding a new token to a YAML pack
+// doesn't blanket-SKIP the catalog on older pev binaries.
+func missingRequires(requires []string, hf discover.HostFacts) string {
+	for _, req := range requires {
+		switch req {
+		case "r":
+			if len(hf.R) == 0 {
+				return req
+			}
+		case "python":
+			if len(hf.Python) == 0 {
+				return req
+			}
+		case "quarto":
+			if len(hf.Quarto) == 0 {
+				return req
+			}
+		case "uv":
+			if !hf.HasUV {
+				return req
+			}
+		case "pip":
+			if !hf.HasPip {
+				return req
+			}
+		case "apt":
+			if !hf.HasApt {
+				return req
+			}
+		case "dnf":
+			if !hf.HasDNF {
+				return req
+			}
+		}
+	}
+	return ""
 }
 
 // expandWith renders any string-typed value in the `with:` payload through

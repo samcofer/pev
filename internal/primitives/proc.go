@@ -24,14 +24,13 @@ func runProc(rc checks.RunCtx) checks.Result {
 	}
 
 	cmd := "systemctl is-" + state + " " + unit
-	rc.CmdLog.Append(cmd)
 	out, err := system.RunCaptured(rc.Ctx, cmd, 5*time.Second)
 	if err != nil {
 		return unknownf(rc.Check, "systemctl: %v", err)
 	}
 	got := strings.TrimSpace(out.Stdout)
 	r := checks.Result{
-		ID: rc.Check.ID, Title: rc.Check.Title, Severity: rc.Check.Severity,
+		ID: rc.Check.ID, Title: rc.Check.Title,
 		Evidence: []checks.Evidence{{Command: cmd, Stdout: got, Stderr: out.Stderr}},
 	}
 	if got == state {

@@ -10,7 +10,7 @@ Assess Linux readiness before installing **Posit Workbench**, **Posit Connect**,
 
 ## Why pev exists
 
-Today, the prereq verification call before a Posit install is a manual checklist exercise driven by a runbook, interpreted live by an SE on a Webex call. That process is slow, inconsistent across SEs, and produces no shareable artifact. pev replaces the manual pass with an automated assessment that defaults to discovery (it shells out to the same OS commands a Linux admin would type at the terminal) and produces a graded report identifying every blocking issue *before* the install session — turning the prereq meeting from "let me poke around your box" into "let's review the report you ran yesterday."
+Today, the prereq verification call before a Posit install is a manual checklist exercise driven by a runbook, interpreted live by an SE on a Webex call. That process is slow, inconsistent across SEs, and produces no shareable artifact. pev replaces the manual pass with an automated assessment that defaults to discovery (it shells out to the same OS commands a Linux admin would type at the terminal) and produces a report identifying every issue *before* the install session — turning the prereq meeting from "let me poke around your box" into "let's review the report you ran yesterday." Every failed check is worth investigating; pev does not try to predict which failures the customer can defer.
 
 ## Scope
 
@@ -67,29 +67,111 @@ A trimmed report excerpt:
 ```
 # pev report — db-prod-01 — 2026-06-03 14:22:05 UTC
 
-## Executive summary
-| Severity | Pass | Fail | Skip | Unknown |
-|---:|---:|---:|---:|---:|
-| blocking | 18 | 2 | 1 | 0 |
-| warning  | 24 | 3 | 0 | 0 |
-| info     | 11 | 0 | 2 | 0 |
+## Summary
+| Pass | Fail | Skip | Unknown |
+|---:|---:|---:|---:|
+|   53 |    5 |    3 |    0 |
 
-**2 blocking failure(s)** — install will not succeed until resolved.
+**5 failure(s)** — investigate before proceeding.
 ```
 
 ## What it checks
 
-Every built-in check maps to an authoritative Posit doc and (where applicable) to a row in the customer prereq runbook. Run `pev list-checks` for the full catalog. Headlines:
+Every built-in check maps to an authoritative Posit doc and (where applicable) to a row in the customer prereq runbook. Run `pev list-checks` to dump the catalog at any time.
 
-| Area | Examples |
-|------|----------|
-| OS support | Ubuntu 22.04 / 24.04, RHEL/Alma/Rocky 8 / 9 / 10 (Ubuntu 20.04 flagged blocking) |
-| Sizing | Workbench 4c/8GB/100GB · Connect 4GB/100GB · PPM 4c/16GB/500GB |
-| Network egress | cdn.rstudio.com, cdn.posit.co, packagemanager.posit.co, rspm-sync.rstudio.com, wyDay license activation |
-| System packages | gdebi-core, libssl-dev / openssl-devel, libxml2-dev, libcurl-dev |
-| Workbench prereqs | customer-supplied SSL cert/key validity, /opt/R/\*, /opt/python/\*, Quarto, IdP metadata reachability |
-| Connect prereqs | customer-supplied SSL cert/key validity, SMTP reachability, Quarto |
-| PPM prereqs | customer-supplied SSL cert/key validity, rspm-sync.rstudio.com reachable |
+The full built-in catalog (run `pev list-checks` for the live version):
+
+### Operating System
+
+| ID | Title |
+|---|---|
+| `os.supported` | Operating system is supported by Posit professional products |
+| `os.architecture.amd64-or-arm64` | CPU architecture is amd64 or arm64 |
+| `os.tmp.exec` | /tmp is mounted exec (not noexec) |
+| `os.home.exec` | /home is mounted exec (not noexec) |
+
+### Sizing
+
+| ID | Title |
+|---|---|
+| `sizing.workbench.minimum` | Host meets Workbench minimum sizing (4 cores / 8 GB / 100 GB) |
+| `sizing.connect.minimum` | Host meets Connect minimum sizing (4 GB / 100 GB) |
+| `sizing.packagemanager.recommended` | Host meets Package Manager recommended sizing (4 cores / 16 GB / 500 GB) |
+
+### Networking — Egress
+
+| ID | Title |
+|---|---|
+| `net.egress.cdn-rstudio` | TLS reachability to cdn.rstudio.com:443 |
+| `net.egress.cdn-posit` | TLS reachability to cdn.posit.co:443 |
+| `net.egress.download2-rstudio` | TLS reachability to download2.rstudio.org:443 |
+| `net.egress.license-activation` | TLS reachability to www.wyday.com:443 (license activation) |
+| `net.egress.packagemanager-posit-ping` | HTTPS GET packagemanager.posit.co/__ping__ returns 200 |
+| `net.egress.p3m` | TLS reachability to p3m.dev:443 (Posit Public Package Manager) |
+| `net.egress.cran` | TLS reachability to cran.r-project.org:443 |
+| `net.egress.bioconductor` | TLS reachability to bioconductor.org:443 |
+| `net.egress.pypi` | TLS reachability to pypi.org:443 |
+| `net.egress.pypi-files` | TLS reachability to files.pythonhosted.org:443 |
+| `ppm.egress.sync` | Package Manager can reach the Posit Package Service |
+
+### Security
+
+| ID | Title |
+|---|---|
+| `sec.selinux.status` | SELinux mode is reported (RHEL family) |
+| `sec.apparmor.status` | AppArmor mode is reported (Ubuntu) |
+| `sec.firewalld.inactive` | firewalld is not active (or rules permit Posit ports) |
+| `sec.iptables.inactive` | iptables service is not active (or rules permit Posit ports) |
+| `sec.nftables.inactive` | nftables service is not active (or rules permit Posit ports) |
+
+### Distro Package Manager Health
+
+| ID | Title |
+|---|---|
+| `pkg-mgr.apt.update` | apt-get update succeeds (Ubuntu) |
+| `pkg-mgr.apt.repolist-fresh` | apt repository metadata is recent (< 30 days) |
+| `pkg-mgr.dnf.repolist` | dnf repolist succeeds (RHEL) |
+| `pkg-mgr.dnf.makecache` | dnf makecache succeeds |
+
+### Build-Dep System Packages
+
+| ID | Title |
+|---|---|
+| `pkg.gdebi.ubuntu` | gdebi-core installed (Ubuntu) |
+| `pkg.openssl-dev` | openssl development headers installed |
+| `pkg.libcurl-dev` | libcurl development headers installed |
+| `pkg.libxml2-dev` | libxml2 development headers installed |
+
+### SSL / TLS (customer-supplied; opt-in prompt)
+
+| ID | Title |
+|---|---|
+| `workbench.ssl.cert-key-match` | Workbench SSL certificate and key are paired |
+| `connect.ssl.cert-key-match` | Connect SSL certificate and key are paired |
+| `ppm.ssl.cert-key-match` | Package Manager SSL certificate and key are paired |
+
+### Languages & Identity (common to all products)
+
+These checks are no longer scoped to a single product — they apply to any
+host running Workbench, Connect, or Package Manager. The user-install
+checks run as the unprivileged user pev auto-detects (or prompts for, if
+running as root) and use the latest discovered R / Python under `/opt`.
+
+| ID | Title |
+|---|---|
+| `lang.r.versioned-install` | At least one R install at `/opt/R/<version>/bin/R` |
+| `lang.r.renv-user-install` | Unprivileged user can install renv with the latest R |
+| `lang.python.versioned-install` | At least one Python install at `/opt/python/<version>/bin/python3` |
+| `lang.python.uv-venv` | Unprivileged user can create a uv venv with the latest Python |
+| `lang.python.pip-venv` | Unprivileged user can create a venv via `python -m venv` + pip install |
+| `lang.quarto.present` | Quarto is available on PATH |
+| `lang.idp.metadata` | IdP metadata or discovery URL is reachable |
+
+### Connect-specific
+
+| ID | Title |
+|---|---|
+| `connect.smtp.reachable` | SMTP server reachable from Connect host |
 
 Anything that requires a Posit product to be already installed (license-manager status, parsing rserver.conf, etc.) is **out of scope** — that's `vip`'s job. See [docs/runbook-mapping.md](docs/runbook-mapping.md) for the full prereq → check ID table and the explicit out-of-scope list.
 

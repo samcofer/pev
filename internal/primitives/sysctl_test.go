@@ -15,7 +15,7 @@ func TestSysctlPrimitive(t *testing.T) {
 	// kernel.osrelease always exists on Linux and is a non-empty string;
 	// we don't assert a numeric range, just that the read succeeds.
 	c := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityInfo, Primitive: "sysctl",
+		ID: "x", Title: "x", Primitive: "sysctl",
 		With: map[string]interface{}{"key": "kernel.osrelease"},
 	}
 	r := runRC(t, c, discover.HostFacts{})
@@ -24,7 +24,7 @@ func TestSysctlPrimitive(t *testing.T) {
 	}
 
 	missing := checks.Check{
-		ID: "x", Title: "x", Severity: checks.SeverityInfo, Primitive: "sysctl",
+		ID: "x", Title: "x", Primitive: "sysctl",
 		With: map[string]interface{}{"key": "kernel.this_does_not_exist"},
 	}
 	r = runRC(t, missing, discover.HostFacts{})

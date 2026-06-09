@@ -4,18 +4,12 @@ import "testing"
 
 func TestFilter(t *testing.T) {
 	in := []Check{
-		{ID: "a", Severity: SeverityInfo, Tags: []string{"net"}, AppliesTo: AppliesTo{Products: []string{"workbench"}}},
-		{ID: "b", Severity: SeverityWarning, Tags: []string{"net", "egress"}, AppliesTo: AppliesTo{Products: []string{"connect"}}},
-		{ID: "c", Severity: SeverityBlocking, Tags: []string{"license"}},
-		{ID: "d", Severity: SeverityWarning, Tags: []string{"experimental"}},
+		{ID: "a", Tags: []string{"net"}, AppliesTo: AppliesTo{Products: []string{"workbench"}}},
+		{ID: "b", Tags: []string{"net", "egress"}, AppliesTo: AppliesTo{Products: []string{"connect"}}},
+		{ID: "c", Tags: []string{"license"}},
+		{ID: "d", Tags: []string{"experimental"}},
 	}
 
-	t.Run("severity-min", func(t *testing.T) {
-		got := Filter{SeverityMin: SeverityWarning}.Apply(in)
-		if got, want := len(got), 3; got != want {
-			t.Fatalf("got %d, want %d", got, want)
-		}
-	})
 	t.Run("must-have-tags", func(t *testing.T) {
 		got := Filter{Tags: []string{"net", "egress"}}.Apply(in)
 		if len(got) != 1 || got[0].ID != "b" {

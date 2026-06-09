@@ -43,6 +43,13 @@ type Driver interface {
 	Confirm(question string, defaultValue bool) (bool, error)
 	Select(question string, options []string, defaultValue string) (string, error)
 	MultiSelect(question string, options, defaultValues []string) ([]string, error)
+	// Password reads a secret with terminal echo turned off. Q/A logs
+	// emit the question and the literal "(redacted)" so the secret
+	// never lands in pev-log-*.log. In yes / non-interactive mode the
+	// returned value is empty — there is no sensible default for a
+	// secret, so callers should treat empty as "skip" and SKIP the
+	// dependent check.
+	Password(question string) (string, error)
 }
 
 // surveyDriver is the production Driver implementation backed by survey/v2.
@@ -119,6 +126,26 @@ func (s *surveyDriver) Select(question string, options []string, defaultValue st
 		return "", err
 	}
 	logQA(question, out)
+	return out, nil
+}
+
+// Password asks for a secret, displaying asterisks instead of the typed
+// characters. The Q/A log writes "(redacted)" rather than the actual
+// secret. In yes / non-interactive mode the returned value is empty: a
+// password has no sensible auto-default, so callers should treat empty
+// as "skip" and SKIP the dependent check.
+func (s *surveyDriver) Password(question string) (string, error) {
+	switch s.mode {
+	case ModeYes, ModeNonInteractive:
+		logQA(question, "(redacted)")
+		return "", nil
+	}
+	out := ""
+	p := &survey.Password{Message: question}
+	if err := survey.AskOne(p, &out); err != nil {
+		return "", err
+	}
+	logQA(question, "(redacted)")
 	return out, nil
 }
 

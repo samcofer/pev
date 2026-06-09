@@ -27,6 +27,30 @@ type HostFacts struct {
 	R        []string       `json:"r_versions,omitempty"`
 	Python   []string       `json:"python_versions,omitempty"`
 	Quarto   []string       `json:"quarto_versions,omitempty"`
+
+	// Tooling — set by Gather based on availability on the running host.
+	// Used by the catalog's `applies_to.requires` fact gate so the engine
+	// can SKIP language-dependent checks rather than running them and
+	// reporting unhelpful UNKNOWNs.
+	HasUV  bool `json:"has_uv,omitempty"`
+	HasPip bool `json:"has_pip,omitempty"`
+	HasApt bool `json:"has_apt,omitempty"`
+	HasDNF bool `json:"has_dnf,omitempty"`
+
+	// LatestR / LatestPython are the highest-versioned versioned
+	// installations found under /opt/R/<ver>/bin/R and
+	// /opt/python/<ver>/bin/python(3). Empty when none are detected.
+	// Used by the user-install checks so renv/uv/pip use the most
+	// recent toolchain a customer would deploy with.
+	LatestR      string `json:"latest_r,omitempty"`
+	LatestPython string `json:"latest_python,omitempty"`
+
+	// PPMLinuxSlug is the `__linux__` distro slug Posit Package Manager
+	// uses in repo URLs (jammy, noble, rhel9, etc). Computed from OS at
+	// Gather time so YAML packs can write
+	// `https://packagemanager.posit.co/cran/__linux__/{{ .Facts.PPMLinuxSlug }}/latest`
+	// and have the right binary repo per host.
+	PPMLinuxSlug string `json:"ppm_linux_slug,omitempty"`
 }
 
 // Gather runs every discovery probe and returns the resulting HostFacts.
@@ -53,5 +77,32 @@ func Gather(ctx context.Context) HostFacts {
 	hf.R = ScanRVersions()
 	hf.Python = ScanPythonVersions()
 	hf.Quarto = ScanQuartoVersions()
+	hf.LatestR = LatestVersionedPath(hf.R)
+	hf.LatestPython = LatestVersionedPath(hf.Python)
+	hf.HasUV = system.CommandExists("uv")
+	hf.HasPip = system.CommandExists("pip3") || system.CommandExists("pip")
+	hf.HasApt = system.CommandExists("apt-get")
+	hf.HasDNF = system.CommandExists("dnf")
+	hf.PPMLinuxSlug = ppmLinuxSlug(hf.OS)
 	return hf
+}
+
+// ppmLinuxSlug maps pev's canonical OS id to the `__linux__/<slug>` PPM
+// path component. Slugs come from
+// https://packagemanager.posit.co/client/#/repos/cran/setup — they are NOT
+// /etc/os-release IDs, so we keep the mapping explicit.
+func ppmLinuxSlug(osID string) string {
+	switch osID {
+	case "ubuntu-22.04":
+		return "jammy"
+	case "ubuntu-24.04":
+		return "noble"
+	case "rhel-8":
+		return "centos8"
+	case "rhel-9":
+		return "rhel9"
+	case "rhel-10":
+		return "rhel10"
+	}
+	return ""
 }
