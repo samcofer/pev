@@ -22,6 +22,7 @@ with:
 | `expect_exit` | unset | when set, `exit code != value` ⇒ fail |
 | `expect_stdout_regex` | unset | Go regex; mismatch ⇒ fail |
 | `expect_stderr_regex` | unset | Go regex; mismatch ⇒ fail |
+| `skip_exit` | unset | when set, `exit code == value` ⇒ skip (script says "not applicable on this host"); first non-blank stdout/stderr line becomes the reason |
 | `timeout_seconds` | 30 | command is killed and check fails |
 
 ## `file`

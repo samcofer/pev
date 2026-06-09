@@ -29,6 +29,8 @@ Update the following files to match (search for "docker.io/posit/"):
   - .github/workflows/posit-images.yml
   - test/posit-images/run.sh
 
-Then run \`bash test/posit-images/run.sh\` locally to confirm the new
-images still produce zero blocking failures before opening the PR.
+Then run \`bash test/posit-images/run.sh\` locally. If the new images
+introduce new fail/unknown checks, decide whether each is a real
+regression or a stable allowlist entry, and update the allowlists in
+both posit-images.yml and test/posit-images/run.sh before opening the PR.
 EOF

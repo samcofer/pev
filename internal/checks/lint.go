@@ -6,8 +6,8 @@ import (
 )
 
 // Lint validates a list of Checks for catalog correctness: required fields,
-// known primitive, allowed `with:` keys per primitive, valid severity, no
-// duplicate IDs. Returns one error per violation; callers may wrap them.
+// known primitive, allowed `with:` keys per primitive, no duplicate IDs.
+// Returns one error per violation; callers may wrap them.
 func Lint(checks []Check) []error {
 	var errs []error
 	seen := map[string]string{}

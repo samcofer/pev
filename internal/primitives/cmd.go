@@ -1,6 +1,7 @@
 package primitives
 
 import (
+	"fmt"
 	"os"
 	"os/user"
 	"regexp"
@@ -14,7 +15,7 @@ import (
 func init() {
 	checks.Register("cmd", runCmd, []string{
 		"cmd", "expect_exit", "expect_stdout_regex", "expect_stderr_regex",
-		"timeout_seconds", "as_user",
+		"timeout_seconds", "as_user", "skip_exit",
 	})
 }
 
@@ -91,9 +92,27 @@ func runCmd(rc checks.RunCtx) checks.Result {
 		return r
 	}
 
+	// `skip_exit` lets a YAML author signal "this check is not applicable
+	// on this host" from inside the script (e.g. "no apt lists present
+	// yet"). Matching exit code → SKIP, with the script's stdout becoming
+	// the human-readable reason. Checked before expect_exit so a script
+	// can use a single exit code to mean either pass or skip.
+	if skip, ok := getInt(rc.Check.With, "skip_exit"); ok && res.ExitCode == skip {
+		r.Status = checks.StatusSkip
+		reason := firstNonBlankLine(res.Stdout)
+		if reason == "" {
+			reason = firstNonBlankLine(res.Stderr)
+		}
+		if reason == "" {
+			reason = fmt.Sprintf("script signalled skip (exit %d)", skip)
+		}
+		r.Reason = reason
+		return r
+	}
+
 	if want, ok := getInt(rc.Check.With, "expect_exit"); ok && res.ExitCode != want {
 		r.Status = checks.StatusFail
-		r.Reason = "exit code != expected"
+		r.Reason = fmt.Sprintf("exit %d != expected %d%s", res.ExitCode, want, outputSnippet(res.Stdout, res.Stderr))
 		return r
 	}
 	if pat, ok := getString(rc.Check.With, "expect_stdout_regex"); ok && pat != "" {
@@ -103,7 +122,7 @@ func runCmd(rc checks.RunCtx) checks.Result {
 		}
 		if !re.MatchString(res.Stdout) {
 			r.Status = checks.StatusFail
-			r.Reason = "stdout did not match expect_stdout_regex"
+			r.Reason = "stdout did not match expect_stdout_regex" + outputSnippet(res.Stdout, res.Stderr)
 			return r
 		}
 	}
@@ -114,13 +133,42 @@ func runCmd(rc checks.RunCtx) checks.Result {
 		}
 		if !re.MatchString(res.Stderr) {
 			r.Status = checks.StatusFail
-			r.Reason = "stderr did not match expect_stderr_regex"
+			r.Reason = "stderr did not match expect_stderr_regex" + outputSnippet(res.Stdout, res.Stderr)
 			return r
 		}
 	}
 
 	r.Status = checks.StatusPass
 	return r
+}
+
+// outputSnippet returns a short, single-line summary of the command's stdout
+// and stderr, prefixed with ": ", suitable for tacking onto a fail Reason.
+// Returns "" when both streams are empty. The full text is still kept on
+// the Result's Evidence; this just makes the terminal/CI line useful at a
+// glance ("exit 1 != expected 0: setfacl not installed").
+func outputSnippet(stdout, stderr string) string {
+	out := firstNonBlankLine(stdout)
+	if out == "" {
+		out = firstNonBlankLine(stderr)
+	}
+	if out == "" {
+		return ""
+	}
+	if len(out) > 240 {
+		out = out[:240] + "…"
+	}
+	return ": " + out
+}
+
+func firstNonBlankLine(s string) string {
+	for _, line := range strings.Split(s, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			return line
+		}
+	}
+	return ""
 }
 
 func truncate(s string, n int) string {
