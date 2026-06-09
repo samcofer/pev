@@ -49,13 +49,12 @@ Checklist:
 
 1. Confirm the check is a pre-install prerequisite (see scope test above).
 2. Pick an `id` using dotted convention `<area>.<topic>.<facet>` (e.g. `workbench.idp.metadata`). Ids are forever — duplicates cause load failure.
-3. Pick a `severity` (`blocking` | `warning` | `info`). Block customer installs only on truly install-blocking issues.
-4. Write a `why:` block — this rationale is shown in the report. Two sentences, plain English, customer-readable.
-5. Pick a `primitive:` and the matching `with:` payload. Run `pev list-checks --tags <existing-tag>` to find similar examples.
-6. List `references:` URLs from Posit docs (kapa-verified preferred).
-7. Gate via `applies_to.os/products/arch` and `requires_root` as appropriate.
-8. If the check derives from a runbook prereq, add a row to `docs/runbook-mapping.md`.
-9. `make lint && make test`. If you added a new primitive too, see §6.
+3. Write a `why:` block — this rationale is shown in the report. Two sentences, plain English, customer-readable. Every FAIL is treated as worth investigating; pev does not classify checks into severity tiers.
+4. Pick a `primitive:` and the matching `with:` payload. Run `pev list-checks --tags <existing-tag>` to find similar examples.
+5. List `references:` URLs from Posit docs (kapa-verified preferred).
+6. Gate via `applies_to.os/products/arch` and `requires_root` as appropriate.
+7. If the check derives from a runbook prereq, add a row to `docs/runbook-mapping.md`.
+8. `make lint && make test`. If you added a new primitive too, see §6.
 
 ## 6. Authoring a new primitive
 
@@ -71,7 +70,7 @@ Only when an existing primitive cannot express the check.
 
 - Every code change runs `make test` (race + shuffle).
 - Every catalog change runs `make e2e` against at least one Ubuntu and one RHEL-family container.
-- Release-blocker checks (`severity: blocking`) require an end-to-end fixture proving both PASS and FAIL paths before merging.
+- New checks should ship with an end-to-end fixture proving both PASS and FAIL paths before merging.
 
 ## 8. What not to do
 

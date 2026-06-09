@@ -4,43 +4,59 @@ Each row in the customer onboarding runbook (the BCBS-style "Prerequisites" tab)
 
 This file is the contract — when a runbook prereq lands here, the corresponding YAML check exists in the catalog and is exercised by CI.
 
+Every FAIL is treated as worth investigating; pev does not classify checks
+into severity tiers. The catalog is common-only — language and identity
+checks apply to any host running Workbench, Connect, or Package Manager.
+
 ## Shared infrastructure (all products)
 
-| Runbook prereq | pev check ID(s) | Severity |
-|---|---|---|
-| Linux VM provisioned (CPU/RAM/disk) | `sizing.workbench.minimum`, `sizing.connect.minimum`, `sizing.packagemanager.recommended` | warning |
-| OS supported | `os.supported` | blocking |
-| CPU architecture | `os.architecture.amd64-or-arm64` | blocking |
-| Outbound networking — Posit CDNs | `net.egress.cdn-rstudio`, `net.egress.cdn-posit` | blocking |
-| Outbound networking — license activation | `net.egress.license-activation` | warning |
-| R installed under `/opt/R/<version>` | `workbench.r.versioned-install` | warning |
-| Python installed under `/opt/python/<version>` | `workbench.python.versioned-install` | warning |
-| System dependencies (build deps for R/Python packages) | `pkg.openssl-dev`, `pkg.libcurl-dev`, `pkg.libxml2-dev`, `pkg.gdebi.ubuntu` | warning |
+| Runbook prereq | pev check ID(s) |
+|---|---|
+| Linux VM provisioned (CPU/RAM/disk) | `sizing.workbench.minimum`, `sizing.connect.minimum`, `sizing.packagemanager.minimum` |
+| OS supported | `os.supported` |
+| CPU architecture | `os.architecture.amd64-or-arm64` |
+| OS runtime (file limits, cgroups v2, UTF-8 locale) | `os.ulimit.nofile`, `os.cgroups.v2-available`, `os.locale.utf8` |
+| RHEL subscription attached | `os.subscription-manager.attached` |
+| /tmp and /home mounted exec | `os.tmp.exec`, `os.home.exec` |
+| Home share (NFS) is writable, persistent, ACL-capable, no uid squash | `os.home.root-writable`, `os.home.nfs.no-root-squash`, `os.home.user-uid-preserved`, `storage.home.share.mounted`, `storage.home.fstab-persistent`, `storage.acl.posix.home-and-local`, `storage.acl.nfsv4`, `pkg.nfs-utils.installed` |
+| Hostname / FQDN resolves | `net.dns.fqdn-resolves-to-self` |
+| Default ports bindable | `net.bind.workbench-8787`, `net.bind.connect-3939`, `net.bind.packagemanager-4242` |
+| Outbound networking — Posit CDNs | `net.egress.cdn-rstudio`, `net.egress.cdn-posit`, `net.egress.download2-rstudio` |
+| Outbound networking — license activation | `net.egress.license-activation` |
+| Outbound networking — package mirrors | `net.egress.packagemanager-posit-ping`, `net.egress.p3m`, `net.egress.cran`, `net.egress.bioconductor`, `net.egress.pypi`, `net.egress.pypi-files` |
+| Distro package manager healthy | `pkg-mgr.apt.update`, `pkg-mgr.apt.repolist-fresh`, `pkg-mgr.dnf.repolist`, `pkg-mgr.dnf.makecache` |
+| System dependencies (build deps for R/Python packages) | `pkg.openssl-dev`, `pkg.libcurl-dev`, `pkg.libxml2-dev`, `pkg.gdebi.ubuntu` |
+| Posit Pro Drivers installed (when declared) | `pkg.pro-drivers.installed` |
+| Security posture (umask, SELinux/AppArmor, firewalls) | `sec.umask.permissive`, `sec.selinux.not-enforcing`, `sec.apparmor.not-enabled`, `sec.firewalld.inactive`, `sec.firewalld.posit-ports-allowed`, `sec.iptables.inactive`, `sec.iptables.posit-ports-allowed`, `sec.nftables.inactive`, `sec.nftables.posit-ports-allowed` |
+| R installed under `/opt/R/<version>` | `lang.r.versioned-install` |
+| Python installed under `/opt/python/<version>` | `lang.python.versioned-install` |
+| Quarto available on PATH | `lang.quarto.present` |
+| Unprivileged user can install renv / uv venv / pip venv | `lang.r.renv-user-install`, `lang.python.uv-venv`, `lang.python.pip-venv` |
+| IdP metadata or discovery URL reachable | `lang.idp.metadata` |
+| Customer-supplied PAM/SSO test user resolves | `auth.pam.users-resolvable` |
+| Customer-declared PostgreSQL host is reachable | `db.postgres.reachable` |
 
 ## Package Manager
 
-| Runbook prereq | pev check ID(s) | Severity |
-|---|---|---|
-| SSL certificate for PPM hostname (customer-supplied) | `ppm.ssl.cert-key-match` | blocking |
-| Outbound to Posit Package Service | `ppm.egress.sync` | blocking |
-| Sufficient disk for package cache | `sizing.packagemanager.recommended` | warning |
+| Runbook prereq | pev check ID(s) |
+|---|---|
+| SSL certificate for PPM hostname (customer-supplied) | `ppm.ssl.cert-key-match` |
+| Outbound to Posit Package Service | `ppm.egress.sync` |
+| Sufficient disk for package cache | `sizing.packagemanager.minimum` |
 
 ## Connect
 
-| Runbook prereq | pev check ID(s) | Severity |
-|---|---|---|
-| SSL certificate for Connect hostname (customer-supplied) | `connect.ssl.cert-key-match` | blocking |
-| Outbound email server access | `connect.smtp.reachable` | warning |
-| Quarto installed at `/opt/quarto/<version>` | `connect.quarto.present` | warning |
+| Runbook prereq | pev check ID(s) |
+|---|---|
+| SSL certificate for Connect hostname (customer-supplied) | `connect.ssl.cert-key-match` |
+| Outbound email server access | `connect.smtp.reachable` |
 
 ## Workbench
 
-| Runbook prereq | pev check ID(s) | Severity |
-|---|---|---|
-| SSL certificate for Workbench hostname (customer-supplied) | `workbench.ssl.cert-key-match` | blocking |
-| Quarto available on PATH | `workbench.quarto.present` | warning |
-| IdP metadata or discovery URL reachable | `workbench.idp.metadata` | warning |
-| Desired editors identified | _(human-only checklist)_ | — |
+| Runbook prereq | pev check ID(s) |
+|---|---|
+| SSL certificate for Workbench hostname (customer-supplied) | `workbench.ssl.cert-key-match` |
+| Desired editors identified | _(human-only checklist)_ |
 
 ## Out of scope (handled by `vip`, not pev)
 

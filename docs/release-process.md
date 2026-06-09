@@ -5,14 +5,13 @@ Releases are tagged `vX.Y.Z` on `main` and published as signed GitHub Releases v
 ## Cadence
 
 - **Patch (`v1.2.x`)**: any time, for bug fixes.
-- **Minor (`v1.x.0`)**: when new checks land or existing ones flip severity.
+- **Minor (`v1.x.0`)**: when new checks land or existing ones change behavior.
 - **Major (`vX.0.0`)**: only when `checks.SchemaVersion` changes — `pev diff` rejects mismatched majors, so this is a real break.
 
 ## Version bump rules
 
 - A new check is `feat:` ⇒ minor bump.
-- Severity downgrade (blocking → warning, etc.) is `feat:` ⇒ minor bump.
-- Severity upgrade is `feat!:` if customers might have CI gates that newly flip red ⇒ minor bump with a changelog "behavior change" callout.
+- A behavior change to an existing check that may flip a customer's CI gate is `feat!:` ⇒ minor bump with a changelog "behavior change" callout.
 - Schema bump is `feat!:` ⇒ major bump; ship a migration note.
 
 ## Cutting a release

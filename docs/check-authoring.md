@@ -5,11 +5,10 @@
 ## Minimum viable pack
 
 ```yaml
-schema_version: 1
+schema_version: 2
 checks:
   - id: mycorp.example.binary
     title: My corp's wrapper binary is installed
-    severity: warning
     primitive: file
     why: |
       Our prod images ship a wrapper at /opt/mycorp/bin/wrap. If it's missing,
@@ -31,7 +30,6 @@ pev lint-checks ./mycorp-pack.yaml
 |------|----------|-------------|
 | `id` | yes | Globally unique; convention `<area>.<topic>.<facet>`. |
 | `title` | yes | One-line, present-tense; appears in tables and the Markdown report. |
-| `severity` | yes | `blocking` \| `warning` \| `info`. |
 | `tags` | no | Free-form labels for `--tags`/`--skip-tags`. |
 | `applies_to.os` | no | Canonical OS ids: `ubuntu-22.04`, `ubuntu-24.04`, `rhel-8`, `rhel-9`, `rhel-10`. |
 | `applies_to.products` | no | `workbench` \| `connect` \| `packagemanager`. |
@@ -58,12 +56,6 @@ Missing-key errors during template expansion become `SKIPPED (missing or invalid
 - Use lower-case, dotted segments: `<area>.<topic>.<facet>`.
 - Areas: `os`, `net`, `sizing`, `pkg`, `workbench`, `connect`, `ppm`, `mycorp`.
 - Avoid timestamps and version numbers in IDs — checks evolve, IDs persist.
-
-## Severity guidance
-
-- **blocking** — install will fail or be unusable until fixed.
-- **warning** — install will succeed but something will break later (perf, missing deps for compiling R/Python packages, etc.).
-- **info** — useful diagnostic; never gates anything.
 
 ## Tagging guidance
 

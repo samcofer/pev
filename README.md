@@ -77,60 +77,90 @@ A trimmed report excerpt:
 
 ## What it checks
 
-Every built-in check maps to an authoritative Posit doc and (where applicable) to a row in the customer prereq runbook. Run `pev list-checks` to dump the catalog at any time.
+Every built-in check maps to an authoritative Posit doc and (where applicable) to a row in the customer prereq runbook. Run `pev list-checks` to dump the catalog at any time. Every FAIL is worth investigating; pev does not classify findings into tiers.
 
 The full built-in catalog (run `pev list-checks` for the live version):
 
-### Operating System
+### Operating System & Architecture
 
 | ID | Title |
 |---|---|
 | `os.supported` | Operating system is supported by Posit professional products |
 | `os.architecture.amd64-or-arm64` | CPU architecture is amd64 or arm64 |
+| `os.ulimit.nofile` | Open-file limit (ulimit -Hn) is sufficient for Posit products |
+| `os.cgroups.v2-available` | cgroups v2 (unified hierarchy) is available |
+| `os.locale.utf8` | A UTF-8 locale is configured |
+| `os.subscription-manager.attached` | RHEL subscription-manager reports an attached, current entitlement |
+
+### Filesystem & Home Mount
+
+| ID | Title |
+|---|---|
 | `os.tmp.exec` | /tmp is mounted exec (not noexec) |
 | `os.home.exec` | /home is mounted exec (not noexec) |
+| `os.home.root-writable` | Root can create and own a directory under /home |
+| `os.home.nfs.no-root-squash` | NFS-mounted /home is exported with no_root_squash to this host |
+| `os.home.user-uid-preserved` | Files in $HOME are owned by the running user (no NFS uid squash) |
+| `storage.home.share.mounted` | Customer-supplied home NFS share is mounted writable |
+| `storage.home.fstab-persistent` | Customer-supplied home share survives reboot (in /etc/fstab) |
+| `storage.acl.posix.home-and-local` | POSIX ACLs are supported on /home and local mounts |
+| `storage.acl.nfsv4` | NFSv4 ACLs are supported on every NFSv4 mount |
+| `pkg.nfs-utils.installed` | NFS client package is installed when /home is on NFS |
 
 ### Sizing
 
 | ID | Title |
 |---|---|
-| `sizing.workbench.minimum` | Host meets Workbench minimum sizing (4 cores / 8 GB / 100 GB) |
-| `sizing.connect.minimum` | Host meets Connect minimum sizing (4 GB / 100 GB) |
-| `sizing.packagemanager.recommended` | Host meets Package Manager recommended sizing (4 cores / 16 GB / 500 GB) |
+| `sizing.workbench.minimum` | Host meets Workbench minimum sizing (2 cores / 4 GB / 100 GB) |
+| `sizing.connect.minimum` | Host meets Connect minimum sizing (2 cores / 4 GB / 100 GB) |
+| `sizing.packagemanager.minimum` | Host meets Package Manager minimum sizing (2 cores / 2 GB / 200 GB) |
 
-### Networking — Egress
+### Networking — DNS, Bind, Egress
 
 | ID | Title |
 |---|---|
-| `net.egress.cdn-rstudio` | TLS reachability to cdn.rstudio.com:443 |
-| `net.egress.cdn-posit` | TLS reachability to cdn.posit.co:443 |
-| `net.egress.download2-rstudio` | TLS reachability to download2.rstudio.org:443 |
-| `net.egress.license-activation` | TLS reachability to www.wyday.com:443 (license activation) |
+| `net.dns.fqdn-resolves-to-self` | Host's FQDN (or supplied Workbench URL) resolves to a local IP |
+| `net.bind.workbench-8787` | Workbench default port 8787 is bindable |
+| `net.bind.connect-3939` | Connect default port 3939 is bindable |
+| `net.bind.packagemanager-4242` | Package Manager default port 4242 is bindable |
+| `net.egress.cdn-rstudio` | HTTPS GET cdn.rstudio.com Pro Drivers installer returns 200 |
+| `net.egress.cdn-posit` | HTTPS GET cdn.posit.co PPM installer returns 200 |
+| `net.egress.download2-rstudio` | HTTPS GET download2.rstudio.org returns 200 |
+| `net.egress.license-activation` | HTTPS GET www.wyday.com returns 200 (license activation) |
 | `net.egress.packagemanager-posit-ping` | HTTPS GET packagemanager.posit.co/__ping__ returns 200 |
-| `net.egress.p3m` | TLS reachability to p3m.dev:443 (Posit Public Package Manager) |
-| `net.egress.cran` | TLS reachability to cran.r-project.org:443 |
-| `net.egress.bioconductor` | TLS reachability to bioconductor.org:443 |
-| `net.egress.pypi` | TLS reachability to pypi.org:443 |
-| `net.egress.pypi-files` | TLS reachability to files.pythonhosted.org:443 |
-| `ppm.egress.sync` | Package Manager can reach the Posit Package Service |
+| `net.egress.p3m` | HTTPS GET p3m.dev/__ping__ returns 200 (Posit Public Package Manager) |
+| `net.egress.cran` | HTTPS GET cran.r-project.org PACKAGES index returns 200 |
+| `net.egress.bioconductor` | HTTPS GET bioconductor.org returns 200 |
+| `net.egress.pypi` | HTTPS GET pypi.org/simple/ returns 200 |
+| `net.egress.pypi-files` | HTTPS GET files.pythonhosted.org returns 200 |
+
+### Database
+
+| ID | Title |
+|---|---|
+| `db.postgres.reachable` | Customer-declared PostgreSQL host is reachable |
 
 ### Security
 
 | ID | Title |
 |---|---|
-| `sec.selinux.status` | SELinux mode is reported (RHEL family) |
-| `sec.apparmor.status` | AppArmor mode is reported (Ubuntu) |
+| `sec.umask.permissive` | Login umask permits readable site-packages (umask <= 0027) |
+| `sec.selinux.not-enforcing` | SELinux is not Enforcing |
+| `sec.apparmor.not-enabled` | AppArmor is not enabled |
 | `sec.firewalld.inactive` | firewalld is not active (or rules permit Posit ports) |
+| `sec.firewalld.posit-ports-allowed` | firewalld permits inbound Posit product ports (when active) |
 | `sec.iptables.inactive` | iptables service is not active (or rules permit Posit ports) |
+| `sec.iptables.posit-ports-allowed` | iptables permits inbound Posit product ports (when active) |
 | `sec.nftables.inactive` | nftables service is not active (or rules permit Posit ports) |
+| `sec.nftables.posit-ports-allowed` | nftables permits inbound Posit product ports (when active) |
 
 ### Distro Package Manager Health
 
 | ID | Title |
 |---|---|
-| `pkg-mgr.apt.update` | apt-get update succeeds (Ubuntu) |
+| `pkg-mgr.apt.update` | apt-get update succeeds |
 | `pkg-mgr.apt.repolist-fresh` | apt repository metadata is recent (< 30 days) |
-| `pkg-mgr.dnf.repolist` | dnf repolist succeeds (RHEL) |
+| `pkg-mgr.dnf.repolist` | dnf repolist succeeds |
 | `pkg-mgr.dnf.makecache` | dnf makecache succeeds |
 
 ### Build-Dep System Packages
@@ -141,21 +171,14 @@ The full built-in catalog (run `pev list-checks` for the live version):
 | `pkg.openssl-dev` | openssl development headers installed |
 | `pkg.libcurl-dev` | libcurl development headers installed |
 | `pkg.libxml2-dev` | libxml2 development headers installed |
+| `pkg.pro-drivers.installed` | Posit Pro Drivers are installed (when declared) |
 
-### SSL / TLS (customer-supplied; opt-in prompt)
+### Languages & Identity
 
-| ID | Title |
-|---|---|
-| `workbench.ssl.cert-key-match` | Workbench SSL certificate and key are paired |
-| `connect.ssl.cert-key-match` | Connect SSL certificate and key are paired |
-| `ppm.ssl.cert-key-match` | Package Manager SSL certificate and key are paired |
-
-### Languages & Identity (common to all products)
-
-These checks are no longer scoped to a single product — they apply to any
-host running Workbench, Connect, or Package Manager. The user-install
-checks run as the unprivileged user pev auto-detects (or prompts for, if
-running as root) and use the latest discovered R / Python under `/opt`.
+These checks apply to any host running Workbench, Connect, or Package Manager.
+The user-install checks run as the unprivileged user pev auto-detects (or
+prompts for, if running as root) and use the latest discovered R / Python
+under `/opt`.
 
 | ID | Title |
 |---|---|
@@ -166,12 +189,17 @@ running as root) and use the latest discovered R / Python under `/opt`.
 | `lang.python.pip-venv` | Unprivileged user can create a venv via `python -m venv` + pip install |
 | `lang.quarto.present` | Quarto is available on PATH |
 | `lang.idp.metadata` | IdP metadata or discovery URL is reachable |
+| `auth.pam.users-resolvable` | Customer-supplied PAM/SSO test user resolves through nsswitch |
 
-### Connect-specific
+### Per-product (customer-supplied; opt-in)
 
 | ID | Title |
 |---|---|
+| `workbench.ssl.cert-key-match` | Workbench SSL certificate and key are paired |
+| `connect.ssl.cert-key-match` | Connect SSL certificate and key are paired |
 | `connect.smtp.reachable` | SMTP server reachable from Connect host |
+| `ppm.ssl.cert-key-match` | Package Manager SSL certificate and key are paired |
+| `ppm.egress.sync` | Package Manager can reach the Posit Package Service |
 
 Anything that requires a Posit product to be already installed (license-manager status, parsing rserver.conf, etc.) is **out of scope** — that's `vip`'s job. See [docs/runbook-mapping.md](docs/runbook-mapping.md) for the full prereq → check ID table and the explicit out-of-scope list.
 
@@ -193,7 +221,6 @@ schema_version: 1
 checks:
   - id: mycorp.cron.installed
     title: Internal cron job for log rotation is installed
-    severity: warning
     tags: [internal]
     primitive: file
     why: |
@@ -222,7 +249,7 @@ Every `pev assess` writes four files:
 |--------------------------|-------------------------|------------------------------------------------------|
 | Ubuntu 22.04             | Supported               |                                                       |
 | Ubuntu 24.04             | Supported               |                                                       |
-| Ubuntu 20.04             | **Unsupported** (block) | EOL across all three Posit products                   |
+| Ubuntu 20.04             | **Unsupported**         | EOL across all three Posit products                   |
 | RHEL 8 / 9 / 10          | Supported               | UBI requires registry auth                            |
 | Alma Linux 8 / 9 / 10    | Supported               | RHEL-family rebuild; collapsed onto `rhel-<major>` ID |
 | Rocky Linux 8 / 9 / 10   | Supported               | Same as Alma                                          |
