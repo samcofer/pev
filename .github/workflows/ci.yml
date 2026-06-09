@@ -65,7 +65,9 @@ jobs:
       - name: govulncheck (advisory)
         continue-on-error: true
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          # Pin to a release compatible with our go.mod's go directive.
+          # The @latest line moved to requiring go >= 1.25 in v1.3.0.
+          go install golang.org/x/vuln/cmd/govulncheck@v1.2.0
           govulncheck ./...
 
   build-matrix:
