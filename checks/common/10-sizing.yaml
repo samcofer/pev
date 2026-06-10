@@ -7,6 +7,7 @@ schema_version: 2
 checks:
   - id: sizing.workbench.minimum
     title: Host meets Workbench minimum sizing (2 cores / 4 GB / 100 GB)
+    short_description: Checking Workbench minimum CPU/RAM/disk sizing
     tags: [sizing, workbench]
     applies_to:
       products: [workbench]
@@ -26,6 +27,7 @@ checks:
 
   - id: sizing.connect.minimum
     title: Host meets Connect minimum sizing (2 cores / 4 GB / 100 GB)
+    short_description: Checking Connect minimum CPU/RAM/disk sizing
     tags: [sizing, connect]
     applies_to:
       products: [connect]
@@ -45,6 +47,7 @@ checks:
 
   - id: sizing.packagemanager.minimum
     title: Host meets Package Manager minimum sizing (2 cores / 2 GB / 200 GB)
+    short_description: Checking Package Manager minimum CPU/RAM/disk sizing
     tags: [sizing, packagemanager]
     applies_to:
       products: [packagemanager]

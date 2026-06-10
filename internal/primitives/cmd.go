@@ -112,7 +112,7 @@ func runCmd(rc checks.RunCtx) checks.Result {
 
 	if want, ok := getInt(rc.Check.With, "expect_exit"); ok && res.ExitCode != want {
 		r.Status = checks.StatusFail
-		r.Reason = fmt.Sprintf("exit %d != expected %d%s", res.ExitCode, want, outputSnippet(res.Stdout, res.Stderr))
+		r.Reason = failReason(res, fmt.Sprintf("command failed (exit %d)", res.ExitCode))
 		return r
 	}
 	if pat, ok := getString(rc.Check.With, "expect_stdout_regex"); ok && pat != "" {
@@ -122,7 +122,7 @@ func runCmd(rc checks.RunCtx) checks.Result {
 		}
 		if !re.MatchString(res.Stdout) {
 			r.Status = checks.StatusFail
-			r.Reason = "stdout did not match expect_stdout_regex" + outputSnippet(res.Stdout, res.Stderr)
+			r.Reason = failReason(res, "command output did not match the expected pattern")
 			return r
 		}
 	}
@@ -133,7 +133,7 @@ func runCmd(rc checks.RunCtx) checks.Result {
 		}
 		if !re.MatchString(res.Stderr) {
 			r.Status = checks.StatusFail
-			r.Reason = "stderr did not match expect_stderr_regex" + outputSnippet(res.Stdout, res.Stderr)
+			r.Reason = failReason(res, "command stderr did not match the expected pattern")
 			return r
 		}
 	}
@@ -142,25 +142,50 @@ func runCmd(rc checks.RunCtx) checks.Result {
 	return r
 }
 
-// outputSnippet returns a short, single-line summary of the command's stdout
-// and stderr, prefixed with ": ", suitable for tacking onto a fail Reason.
-// Returns "" when both streams are empty. The full text is still kept on
-// the Result's Evidence; this just makes the terminal/CI line useful at a
-// glance ("exit 1 != expected 0: setfacl not installed").
-func outputSnippet(stdout, stderr string) string {
-	out := firstNonBlankLine(stdout)
+// failReason builds a customer-readable reason for a failed cmd-primitive
+// run. The script's last echoed line is the most reliable diagnostic — by
+// convention every cmd: script in the catalog prints its problem
+// description as the final line of stdout (or stderr) before exit 1. When
+// the script said something useful, we promote that line as the reason
+// and bury the exit-code arithmetic in a parenthetical. When the script
+// went silent we fall back to the supplied default (e.g. "command failed
+// (exit 1)") so the SE at least sees a non-zero status.
+func failReason(res system.CommandResult, fallback string) string {
+	out := lastNonBlankLine(res.Stdout)
 	if out == "" {
-		out = firstNonBlankLine(stderr)
+		out = lastNonBlankLine(res.Stderr)
 	}
 	if out == "" {
-		return ""
+		return fallback
 	}
 	if len(out) > 240 {
 		out = out[:240] + "…"
 	}
-	return ": " + out
+	if res.ExitCode != 0 {
+		return fmt.Sprintf("%s (exit %d)", out, res.ExitCode)
+	}
+	return out
 }
 
+// lastNonBlankLine returns the trailing non-blank line of s, trimmed of
+// leading/trailing whitespace. Catalog scripts conventionally end with
+// the diagnostic line (e.g. "default locale is not UTF-8"); reading from
+// the bottom up surfaces that instead of an unrelated info line printed
+// earlier in the run.
+func lastNonBlankLine(s string) string {
+	lines := strings.Split(s, "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if line != "" {
+			return line
+		}
+	}
+	return ""
+}
+
+// firstNonBlankLine returns the leading non-blank line of s, trimmed.
+// Used by the skip_exit path: scripts that opt into a SKIP exit code
+// conventionally print the skip rationale as the first line of stdout.
 func firstNonBlankLine(s string) string {
 	for _, line := range strings.Split(s, "\n") {
 		line = strings.TrimSpace(line)

@@ -7,6 +7,7 @@ schema_version: 2
 checks:
   - id: db.postgres.reachable
     title: Customer-declared PostgreSQL host is reachable
+    short_description: Probing declared PostgreSQL host:port reachability
     category: Storage
     tags: [database, postgres]
     why: |

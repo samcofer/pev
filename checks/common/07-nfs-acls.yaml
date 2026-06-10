@@ -14,6 +14,7 @@ schema_version: 2
 checks:
   - id: storage.acl.posix.home-and-local
     title: POSIX ACLs are supported on /home and local mounts
+    short_description: Probing POSIX ACL support on /home and local mounts
     category: Storage
     tags: [storage, acl, nfs, posix]
     applies_to:
@@ -37,9 +38,15 @@ checks:
       - https://docs.posit.co/ide/server-pro/admin/project-sharing.html
     primitive: cmd
     with:
+      # The first stdout line is a one-line summary suitable for the
+      # report's `reason:` field; subsequent lines list per-mount detail.
+      # On failure, the summary names the missing tool or the failing
+      # mountpoint(s) so the SE can act without scrolling into evidence.
       cmd: |
         if ! command -v setfacl >/dev/null 2>&1; then
-          echo "setfacl not installed"; exit 1
+          echo "setfacl missing — install acl (apt) / acl (dnf) on the Workbench host"
+          echo "  reason: command -v setfacl returned non-zero"
+          exit 1
         fi
         # Collect mountpoints to test: /home, plus any non-NFSv4 NFS mount.
         # We exclude pseudo filesystems (proc, sys, tmpfs) and read-only mounts.
@@ -49,30 +56,46 @@ checks:
                    && ($1 == "/home" || $2 == "nfs" || $1 ~ /^\/home(\/|$)/) \
                    && $3 !~ /(^|,)ro(,|$)/ {print $1}' | sort -u)
         if [ -z "$mounts" ]; then
-          echo "no testable POSIX-ACL mounts (/home is NFSv4 or absent)"
+          echo "no testable POSIX-ACL mounts (/home is NFSv4 or absent) — nothing to verify"
           exit 0
         fi
-        failed=
+        unsupported=""
+        unwritable=""
+        ok=""
         for m in $mounts; do
           tmp="$m/.pev-aclprobe-$$"
-          : > "$tmp" 2>/dev/null || { failed="$failed $m(write-failed)"; continue; }
+          if ! : > "$tmp" 2>/dev/null; then
+            unwritable="$unwritable $m"
+            continue
+          fi
           if setfacl -m u:nobody:r "$tmp" 2>/dev/null && getfacl "$tmp" 2>/dev/null | grep -q '^user:nobody:'; then
             setfacl -b "$tmp" 2>/dev/null
+            ok="$ok $m"
           else
-            failed="$failed $m"
+            unsupported="$unsupported $m"
           fi
           rm -f "$tmp"
         done
-        if [ -n "$failed" ]; then
-          echo "POSIX ACL not supported on:$failed"
+        if [ -n "$unsupported" ] || [ -n "$unwritable" ]; then
+          # Print the per-bucket detail first; finish with the one-line
+          # summary so cmd's failReason() picks IT up as the report
+          # reason (rather than an unrelated "ok:" trailer).
+          [ -n "$unsupported" ] && echo "  unsupported (filesystem rejected setfacl):$unsupported"
+          [ -n "$unwritable" ]  && echo "  unwritable (cannot create probe file):$unwritable"
+          [ -n "$ok" ]          && echo "  ok:$ok"
+          summary="POSIX ACL probe failed:"
+          [ -n "$unsupported" ] && summary="$summary unsupported{$unsupported }"
+          [ -n "$unwritable" ]  && summary="$summary unwritable{$unwritable }"
+          echo "$summary"
           exit 1
         fi
-        echo "POSIX ACL supported on: $mounts" | tr '\n' ' '; echo
+        echo "POSIX ACL supported on:$ok"
       expect_exit: 0
       timeout_seconds: 15
 
   - id: storage.acl.nfsv4
     title: NFSv4 ACLs are supported on every NFSv4 mount
+    short_description: Probing NFSv4 ACL support on every NFSv4 mount
     category: Storage
     tags: [storage, acl, nfs, nfsv4]
     applies_to:

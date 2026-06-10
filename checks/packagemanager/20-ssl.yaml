@@ -2,6 +2,7 @@ schema_version: 2
 checks:
   - id: ppm.ssl.cert-key-match
     title: Package Manager SSL certificate and key are paired
+    short_description: Verifying Package Manager SSL cert/key pair and hostname match
     category: SSL/TLS
     tags: [ssl, packagemanager]
     applies_to:

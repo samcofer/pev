@@ -14,6 +14,7 @@ schema_version: 2
 checks:
   - id: os.tmp.exec
     title: /tmp is mounted exec (not noexec)
+    short_description: Checking /tmp is not mounted noexec
     category: Operating System
     tags: [os, mount, tmp]
     why: |
@@ -32,13 +33,22 @@ checks:
       - https://docs.posit.co/ide/server-pro/admin/getting_started/installation/installation.html
     primitive: cmd
     with:
-      cmd: "opts=$(findmnt -T /tmp -no OPTIONS) && echo \"$opts\" && ! echo \"$opts\" | grep -q noexec"
+      cmd: |
+        opts=$(findmnt -T /tmp -no OPTIONS 2>/dev/null) || {
+          echo "/tmp is not a known mount point (findmnt found no entry)"
+          exit 1
+        }
+        if echo "$opts" | grep -q noexec; then
+          echo "/tmp is mounted with noexec (options: $opts)"
+          exit 1
+        fi
+        echo "/tmp is mounted exec (options: $opts)"
       expect_exit: 0
-      expect_stdout_regex: '\S'
       timeout_seconds: 5
 
   - id: os.home.exec
     title: /home is mounted exec (not noexec)
+    short_description: Checking /home is not mounted noexec
     category: Operating System
     tags: [os, mount, home]
     why: |
@@ -55,13 +65,22 @@ checks:
       - https://rstudio.github.io/renv/articles/renv.html
     primitive: cmd
     with:
-      cmd: "opts=$(findmnt -T /home -no OPTIONS) && echo \"$opts\" && ! echo \"$opts\" | grep -q noexec"
+      cmd: |
+        opts=$(findmnt -T /home -no OPTIONS 2>/dev/null) || {
+          echo "/home is not a known mount point (findmnt found no entry)"
+          exit 1
+        }
+        if echo "$opts" | grep -q noexec; then
+          echo "/home is mounted with noexec (options: $opts)"
+          exit 1
+        fi
+        echo "/home is mounted exec (options: $opts)"
       expect_exit: 0
-      expect_stdout_regex: '\S'
       timeout_seconds: 5
 
   - id: os.home.root-writable
     title: Root can create and own a directory under /home
+    short_description: Checking root can mkdir+chown under /home
     category: Operating System
     tags: [os, mount, home, nfs]
     requires_root: true
@@ -81,12 +100,25 @@ checks:
       - https://docs.posit.co/ide/server-pro/admin/authenticating-users/index.html
     primitive: cmd
     with:
-      cmd: "d=/home/.pev-roottest-$$; mkdir \"$d\" && chown root:root \"$d\" && rmdir \"$d\""
+      cmd: |
+        d=/home/.pev-roottest-$$
+        if ! mkdir "$d" 2>/dev/null; then
+          echo "root cannot mkdir under /home (read-only mount, squashed root, or restrictive ACL)"
+          exit 1
+        fi
+        if ! chown root:root "$d" 2>/dev/null; then
+          rmdir "$d" 2>/dev/null
+          echo "root cannot chown under /home (likely an NFS export with root_squash)"
+          exit 1
+        fi
+        rmdir "$d"
+        echo "root can mkdir+chown under /home"
       expect_exit: 0
       timeout_seconds: 10
 
   - id: os.home.nfs.no-root-squash
     title: NFS-mounted /home is exported with no_root_squash to this host
+    short_description: Checking NFS /home export honors root writes
     category: Operating System
     tags: [os, mount, home, nfs]
     requires_root: true
@@ -104,27 +136,40 @@ checks:
       - https://linux.die.net/man/5/exports
     primitive: cmd
     with:
-      # When /home is not NFS, exit 0 with a "(skipping; not NFS)" note so
-      # this check passes harmlessly. When /home IS NFS, attempt a
-      # root-owned write — the os.home.root-writable check above already
-      # covers this, so we treat NFS detection as the failure surface.
+      # Intra-test gating: when /home is not NFS, exit 2 → cmd primitive
+      # treats that as SKIP (skip_exit below). When /home IS NFS, attempt
+      # a root-owned write under it — root_squash maps that write to
+      # nobody and the chown fails, surfacing the export misconfig
+      # before install touches /home.
       cmd: |
         fs=$(findmnt -T /home -no FSTYPE)
         case "$fs" in
           nfs|nfs4)
             d=/home/.pev-rstest-$$
-            mkdir "$d" && chown root:root "$d" && rmdir "$d" || exit 1
-            echo "nfs export honors root writes (no_root_squash effective)"
+            if ! mkdir "$d" 2>/dev/null; then
+              echo "root cannot mkdir on the NFS /home export (root writes are being squashed)"
+              exit 1
+            fi
+            if ! chown root:root "$d" 2>/dev/null; then
+              rmdir "$d" 2>/dev/null
+              echo "root cannot chown on the NFS /home export (export is mounted with root_squash)"
+              exit 1
+            fi
+            rmdir "$d"
+            echo "NFS /home export honors root writes (no_root_squash is effective)"
             ;;
           *)
-            echo "/home is $fs (not NFS); root_squash is not applicable"
+            echo "/home is $fs (not NFS); root_squash check not applicable"
+            exit 2
             ;;
         esac
       expect_exit: 0
+      skip_exit: 2
       timeout_seconds: 10
 
   - id: os.home.user-uid-preserved
     title: Files in $HOME are owned by the running user (no NFS uid squash)
+    short_description: Checking $HOME writes preserve the user's uid/gid
     category: Operating System
     tags: [os, mount, home, nfs]
     why: |
@@ -149,11 +194,18 @@ checks:
           exit 0
         fi
         f=$HOME/.pev-uidtest-$$
-        : > "$f" || exit 1
+        if ! : > "$f" 2>/dev/null; then
+          echo "cannot write to \$HOME=$HOME (permissions or read-only mount)"
+          exit 1
+        fi
         owner=$(stat -c '%u:%g' "$f")
         rm -f "$f"
         want="$(id -u):$(id -g)"
-        echo "wrote $f, owner=$owner expected=$want"
-        [ "$owner" = "$want" ]
+        if [ "$owner" = "$want" ]; then
+          echo "\$HOME writes preserve uid/gid (owner=$owner)"
+          exit 0
+        fi
+        echo "\$HOME writes were squashed to owner=$owner (expected $want — likely an NFS all_squash or idmapd misconfig)"
+        exit 1
       expect_exit: 0
       timeout_seconds: 10

@@ -8,6 +8,7 @@ schema_version: 2
 checks:
   - id: sec.umask.permissive
     title: Login umask permits readable site-packages (umask <= 0027)
+    short_description: Checking login umask permits readable site-packages
     category: Security
     tags: [umask, security]
     why: |
@@ -29,12 +30,21 @@ checks:
       # decimal 23 (= octal 027), the strictest mask that still keeps
       # site-packages readable to non-owners. dash and bash both support
       # this; `[[ ]]` arithmetic with `8#nn` does NOT work in dash.
-      cmd: "u=$(umask); val=$(printf %d \"0$u\" 2>/dev/null || echo 999); echo \"umask=$u (decimal=$val)\"; [ \"$val\" -le 23 ]"
+      cmd: |
+        u=$(umask)
+        val=$(printf %d "0$u" 2>/dev/null || echo 999)
+        if [ "$val" -le 23 ]; then
+          echo "login umask is $u (permissive enough for site-packages)"
+          exit 0
+        fi
+        echo "login umask is $u — too restrictive (must be <= 0027 to keep site-packages readable)"
+        exit 1
       expect_exit: 0
       timeout_seconds: 5
 
   - id: os.subscription-manager.attached
     title: RHEL subscription-manager reports an attached, current entitlement
+    short_description: Checking RHEL subscription-manager status
     category: Operating System
     tags: [os, rhel, subscription]
     applies_to:
@@ -75,6 +85,7 @@ checks:
 
   - id: pkg.nfs-utils.installed
     title: NFS client package is installed when /home is on NFS
+    short_description: Checking NFS client package is installed
     category: Packages
     tags: [packages, nfs]
     why: |
@@ -109,6 +120,7 @@ checks:
 
   - id: net.dns.fqdn-resolves-to-self
     title: Host's FQDN (or supplied Workbench URL) resolves to a local IP
+    short_description: Resolving host FQDN against local interfaces
     category: Networking
     tags: [network, dns]
     why: |
@@ -138,6 +150,7 @@ checks:
 
   - id: storage.home.share.mounted
     title: Customer-supplied home NFS share is mounted writable
+    short_description: Checking declared home share is mounted writable
     category: Storage
     tags: [storage, nfs, home]
     why: |
@@ -154,23 +167,37 @@ checks:
       - https://support.posit.co/hc/en-us/articles/360060548093-Deploying-NFS-for-High-Availability-Deployments
     primitive: cmd
     with:
+      # Convention used across the catalog's cmd: scripts — the LAST line
+      # of stdout/stderr on a non-zero exit becomes the SE-facing reason
+      # (see internal/primitives/cmd.go failReason). Echo a clear
+      # diagnostic just before each exit 1 so the report doesn't fall
+      # back to "command failed (exit 1)".
       cmd: |
         path={{ .Inputs.home_share_path }}
         if [ -z "$path" ]; then
           echo "no home_share_path input; skipping"
           exit 0
         fi
-        findmnt -T "$path" -no SOURCE,FSTYPE,OPTIONS
+        if ! mnt=$(findmnt -T "$path" -no SOURCE,FSTYPE,OPTIONS 2>/dev/null); then
+          echo "$path is not mounted (findmnt found no entry)"
+          exit 1
+        fi
+        echo "mount: $mnt"
         # Writability test: must succeed for root or for the unprivileged
         # user. We touch a file and clean up.
         f="$path/.pev-mount-test-$$"
-        : > "$f" || exit 1
+        if ! : > "$f" 2>/dev/null; then
+          echo "cannot write to $path (permissions or read-only mount)"
+          exit 1
+        fi
         rm -f "$f"
+        echo "$path is mounted writable"
       expect_exit: 0
       timeout_seconds: 10
 
   - id: storage.home.fstab-persistent
     title: Customer-supplied home share survives reboot (in /etc/fstab)
+    short_description: Checking declared home share has an /etc/fstab entry
     category: Storage
     tags: [storage, fstab]
     why: |
@@ -192,12 +219,18 @@ checks:
         # Match the exact mountpoint as the second whitespace-separated
         # field. Avoids false positives where the share path is
         # mentioned in a comment or another row's source field.
-        awk -v p="$path" '$1 !~ /^#/ && $2 == p {found=1} END {exit !found}' /etc/fstab
+        if awk -v p="$path" '$1 !~ /^#/ && $2 == p {found=1} END {exit !found}' /etc/fstab; then
+          echo "$path has a matching /etc/fstab entry"
+          exit 0
+        fi
+        echo "no /etc/fstab entry mounts $path (the current mount will not survive reboot)"
+        exit 1
       expect_exit: 0
       timeout_seconds: 5
 
   - id: auth.pam.users-resolvable
     title: Customer-supplied PAM/SSO test user resolves through nsswitch
+    short_description: Resolving customer-supplied PAM test user via nsswitch
     category: Identity
     tags: [auth, pam]
     why: |
@@ -218,12 +251,19 @@ checks:
           echo "no pam_test_user input; skipping"
           exit 0
         fi
-        getent passwd "$u"
+        if entry=$(getent passwd "$u"); then
+          echo "$entry"
+          echo "user '$u' resolves through nsswitch"
+          exit 0
+        fi
+        echo "user '$u' did not resolve via getent passwd (PAM/nsswitch is not finding it)"
+        exit 1
       expect_exit: 0
       timeout_seconds: 10
 
   - id: pkg.pro-drivers.installed
     title: Posit Pro Drivers are installed (when declared)
+    short_description: Checking Posit Pro Drivers package is installed
     category: Packages
     tags: [packages, drivers]
     why: |

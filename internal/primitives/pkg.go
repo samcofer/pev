@@ -64,12 +64,20 @@ func runPkg(rc checks.RunCtx) checks.Result {
 		for _, p := range any {
 			if check(p) {
 				r.Status = checks.StatusPass
-				r.Reason = p + " installed"
+				r.Reason = p + " is installed"
 				return r
 			}
 		}
 		r.Status = checks.StatusFail
-		r.Reason = "none of " + strings.Join(any, ",") + " installed"
+		switch len(any) {
+		case 1:
+			r.Reason = any[0] + " is not installed"
+		default:
+			// Multi-package any_of (cross-distro fallback like
+			// libssl-dev|openssl-devel): name every candidate and
+			// surface that none of them are installed.
+			r.Reason = "none of " + strings.Join(any, ", ") + " are installed"
+		}
 		return r
 	}
 	missing := []string{}

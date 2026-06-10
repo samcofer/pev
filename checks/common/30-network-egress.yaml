@@ -11,6 +11,7 @@ schema_version: 2
 checks:
   - id: net.egress.cdn-rstudio
     title: HTTPS GET cdn.rstudio.com Pro Drivers installer returns 200
+    short_description: Probing egress to cdn.rstudio.com (Pro Drivers)
     category: Networking
     tags: [network, egress]
     why: |
@@ -31,6 +32,7 @@ checks:
 
   - id: net.egress.cdn-posit
     title: HTTPS GET cdn.posit.co PPM installer returns 200
+    short_description: Probing egress to cdn.posit.co (product installers)
     category: Networking
     tags: [network, egress]
     why: |
@@ -50,6 +52,7 @@ checks:
 
   - id: net.egress.download2-rstudio
     title: HTTPS GET download2.rstudio.org returns 200
+    short_description: Probing egress to download2.rstudio.org
     category: Networking
     tags: [network, egress]
     why: |
@@ -67,6 +70,7 @@ checks:
 
   - id: net.egress.license-activation
     title: HTTPS GET www.wyday.com returns 200 (license activation)
+    short_description: Probing egress to wyday.com (online license activation)
     category: Networking
     tags: [network, egress, license]
     why: |
@@ -87,6 +91,7 @@ checks:
 
   - id: net.egress.packagemanager-posit-ping
     title: HTTPS GET packagemanager.posit.co/__ping__ returns 200
+    short_description: Probing egress to packagemanager.posit.co
     category: Networking
     tags: [network, egress, packages]
     why: |
@@ -103,6 +108,7 @@ checks:
 
   - id: net.egress.p3m
     title: HTTPS GET p3m.dev/__ping__ returns 200 (Posit Public Package Manager)
+    short_description: Probing egress to p3m.dev (Public Package Manager)
     category: Networking
     tags: [network, egress, packages]
     why: |
@@ -121,6 +127,7 @@ checks:
 
   - id: net.egress.cran
     title: HTTPS GET cran.r-project.org PACKAGES index returns 200
+    short_description: Probing egress to cran.r-project.org (CRAN PACKAGES index)
     category: Networking
     tags: [network, egress, packages]
     why: |
@@ -137,6 +144,7 @@ checks:
 
   - id: net.egress.bioconductor
     title: HTTPS GET bioconductor.org returns 200
+    short_description: Probing egress to bioconductor.org
     category: Networking
     tags: [network, egress, packages]
     why: |
@@ -151,6 +159,7 @@ checks:
 
   - id: net.egress.pypi
     title: HTTPS GET pypi.org/simple/ returns 200
+    short_description: Probing egress to pypi.org/simple/ (pip index)
     category: Networking
     tags: [network, egress, packages]
     why: |
@@ -166,6 +175,7 @@ checks:
 
   - id: net.egress.pypi-files
     title: HTTPS GET files.pythonhosted.org returns 200
+    short_description: Probing egress to files.pythonhosted.org (pip downloads)
     category: Networking
     tags: [network, egress, packages]
     why: |

@@ -6,6 +6,7 @@ schema_version: 2
 checks:
   - id: pkg-mgr.apt.update
     title: apt-get update succeeds
+    short_description: Running apt-get update against configured repos
     category: Packages
     tags: [packages, apt]
     applies_to:
@@ -26,6 +27,7 @@ checks:
 
   - id: pkg-mgr.apt.repolist-fresh
     title: apt repository metadata is recent (< 30 days)
+    short_description: Checking apt metadata freshness (< 30 days)
     category: Packages
     tags: [packages, apt]
     applies_to:
@@ -61,6 +63,7 @@ checks:
 
   - id: pkg-mgr.dnf.repolist
     title: dnf repolist succeeds
+    short_description: Listing enabled dnf repositories
     category: Packages
     tags: [packages, dnf]
     applies_to:
@@ -78,6 +81,7 @@ checks:
 
   - id: pkg-mgr.dnf.makecache
     title: dnf makecache succeeds
+    short_description: Refreshing dnf metadata cache (this can take a while)
     category: Packages
     tags: [packages, dnf]
     applies_to:

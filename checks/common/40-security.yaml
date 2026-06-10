@@ -7,6 +7,7 @@ schema_version: 2
 checks:
   - id: sec.selinux.not-enforcing
     title: SELinux is not Enforcing
+    short_description: Checking SELinux is not in Enforcing mode
     category: Security
     tags: [selinux, security]
     applies_to:
@@ -33,6 +34,7 @@ checks:
 
   - id: sec.apparmor.not-enabled
     title: AppArmor is not enabled
+    short_description: Checking AppArmor is not enabled
     category: Security
     tags: [apparmor, security]
     applies_to:
@@ -56,6 +58,7 @@ checks:
 
   - id: sec.firewalld.inactive
     title: firewalld is not active (or rules permit Posit ports)
+    short_description: Checking firewalld posture
     category: Security
     tags: [firewall, security]
     applies_to:
@@ -72,6 +75,7 @@ checks:
 
   - id: sec.firewalld.posit-ports-allowed
     title: firewalld permits inbound Posit product ports (when active)
+    short_description: Auditing firewalld rules for Posit ports
     category: Security
     tags: [firewall, security, ports]
     applies_to:
@@ -127,6 +131,7 @@ checks:
 
   - id: sec.iptables.inactive
     title: iptables service is not active (or rules permit Posit ports)
+    short_description: Checking iptables service posture
     category: Security
     tags: [firewall, security]
     why: |
@@ -141,6 +146,7 @@ checks:
 
   - id: sec.iptables.posit-ports-allowed
     title: iptables permits inbound Posit product ports (when active)
+    short_description: Auditing iptables rules for Posit ports
     category: Security
     tags: [firewall, security, ports]
     why: |
@@ -191,6 +197,7 @@ checks:
 
   - id: sec.nftables.inactive
     title: nftables service is not active (or rules permit Posit ports)
+    short_description: Checking nftables service posture
     category: Security
     tags: [firewall, security]
     why: |
@@ -205,6 +212,7 @@ checks:
 
   - id: sec.nftables.posit-ports-allowed
     title: nftables permits inbound Posit product ports (when active)
+    short_description: Auditing nftables ruleset for Posit ports
     category: Security
     tags: [firewall, security, ports]
     why: |

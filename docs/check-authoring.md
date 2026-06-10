@@ -9,6 +9,7 @@ schema_version: 2
 checks:
   - id: mycorp.example.binary
     title: My corp's wrapper binary is installed
+    short_description: Checking mycorp wrapper binary is installed
     primitive: file
     why: |
       Our prod images ship a wrapper at /opt/mycorp/bin/wrap. If it's missing,
@@ -30,6 +31,7 @@ pev lint-checks ./mycorp-pack.yaml
 |------|----------|-------------|
 | `id` | yes | Globally unique; convention `<area>.<topic>.<facet>`. |
 | `title` | yes | One-line, present-tense; appears in tables and the Markdown report. |
+| `short_description` | recommended | Friendly label shown in the engine's per-check progress line as `[i/N] <short_description> (<id>)`. Keep it human-readable and a handful of words long; admins watching a hung run should be able to tell at a glance which check is in flight without decoding the dotted ID. Falls back to the ID alone when omitted. |
 | `tags` | no | Free-form labels for `--tags`/`--skip-tags`. |
 | `applies_to.os` | no | Canonical OS ids: `ubuntu-22.04`, `ubuntu-24.04`, `rhel-8`, `rhel-9`, `rhel-10`. |
 | `applies_to.products` | no | `workbench` \| `connect` \| `packagemanager`. |

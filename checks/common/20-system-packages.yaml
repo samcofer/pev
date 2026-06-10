@@ -2,6 +2,7 @@ schema_version: 2
 checks:
   - id: pkg.gdebi.ubuntu
     title: gdebi-core installed (Ubuntu)
+    short_description: Checking gdebi-core is installed (Ubuntu)
     tags: [packages, ubuntu]
     applies_to:
       os: [ubuntu-22.04, ubuntu-24.04]
@@ -16,6 +17,7 @@ checks:
 
   - id: pkg.openssl-dev
     title: openssl development headers installed
+    short_description: Checking openssl development headers are installed
     tags: [packages, build-deps]
     applies_to:
       products: [workbench, connect, packagemanager]
@@ -29,6 +31,7 @@ checks:
 
   - id: pkg.libcurl-dev
     title: libcurl development headers installed
+    short_description: Checking libcurl development headers are installed
     tags: [packages, build-deps]
     applies_to:
       products: [workbench, connect, packagemanager]
@@ -42,6 +45,7 @@ checks:
 
   - id: pkg.libxml2-dev
     title: libxml2 development headers installed
+    short_description: Checking libxml2 development headers are installed
     tags: [packages, build-deps]
     applies_to:
       products: [workbench, connect, packagemanager]

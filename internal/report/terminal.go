@@ -98,10 +98,10 @@ func RenderTerminal(w io.Writer, rep checks.Report, color bool) {
 			}
 			for _, ev := range r.Evidence {
 				if ev.Command != "" {
-					fmt.Fprintf(w, "    %s %s\n", dim("command:"), ev.Command)
+					fmt.Fprintf(w, "    %s %s\n", dim("command:"), indentMultiline(ev.Command, "      "))
 				}
 				if ev.Note != "" {
-					fmt.Fprintf(w, "    %s %s\n", dim("note:"), ev.Note)
+					fmt.Fprintf(w, "    %s %s\n", dim("note:"), indentMultiline(ev.Note, "      "))
 				}
 			}
 			if r.Why != "" {
@@ -154,6 +154,26 @@ func wrap(s, code string, on bool) string {
 		return s
 	}
 	return code + s + ansiReset
+}
+
+// indentMultiline trims a trailing newline from s and re-indents every line
+// after the first by prefix. The first line is returned unprefixed because
+// the caller has already written the field label and a single space; the
+// goal is to keep continuation lines column-aligned beneath that label.
+func indentMultiline(s, prefix string) string {
+	s = strings.TrimRight(s, "\n")
+	lines := strings.Split(s, "\n")
+	if len(lines) == 1 {
+		return lines[0]
+	}
+	var b strings.Builder
+	b.WriteString(lines[0])
+	for _, line := range lines[1:] {
+		b.WriteByte('\n')
+		b.WriteString(prefix)
+		b.WriteString(line)
+	}
+	return b.String()
 }
 
 func categoryOrder(present map[string][]checks.Result) []string {

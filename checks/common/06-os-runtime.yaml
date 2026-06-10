@@ -10,6 +10,7 @@ schema_version: 2
 checks:
   - id: os.ulimit.nofile
     title: Open-file limit (ulimit -Hn) is sufficient for Posit products
+    short_description: Checking open-file hard limit is at least 65536
     category: Operating System
     tags: [os, ulimit, limits]
     applies_to:
@@ -37,13 +38,18 @@ checks:
     with:
       cmd: |
         hard=$(ulimit -Hn 2>/dev/null || echo 0)
-        echo "ulimit -Hn = $hard"
-        [ "$hard" -ge 65536 ] || [ "$hard" = "unlimited" ]
+        if [ "$hard" = "unlimited" ] || [ "$hard" -ge 65536 ] 2>/dev/null; then
+          echo "ulimit -Hn = $hard (>= 65536)"
+          exit 0
+        fi
+        echo "ulimit -Hn = $hard (below the recommended 65536)"
+        exit 1
       expect_exit: 0
       timeout_seconds: 5
 
   - id: os.cgroups.v2-available
     title: cgroups v2 (unified hierarchy) is available
+    short_description: Checking cgroups v2 unified hierarchy is active
     category: Operating System
     tags: [os, cgroups, workbench]
     applies_to:
@@ -84,6 +90,7 @@ checks:
 
   - id: os.locale.utf8
     title: A UTF-8 locale is configured
+    short_description: Checking system default locale is UTF-8
     category: Operating System
     tags: [os, locale]
     applies_to:

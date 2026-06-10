@@ -50,18 +50,25 @@ type AppliesTo struct {
 
 // Check is one entry in the catalog.
 type Check struct {
-	ID           string                 `yaml:"id" json:"id"`
-	Title        string                 `yaml:"title" json:"title"`
-	Category     string                 `yaml:"category" json:"category,omitempty"`
-	Tags         []string               `yaml:"tags" json:"tags,omitempty"`
-	AppliesTo    AppliesTo              `yaml:"applies_to" json:"applies_to,omitempty"`
-	RequiresRoot bool                   `yaml:"requires_root" json:"requires_root,omitempty"`
-	Why          string                 `yaml:"why" json:"why,omitempty"`
-	Remediation  string                 `yaml:"remediation" json:"remediation,omitempty"`
-	References   []string               `yaml:"references" json:"references,omitempty"`
-	Primitive    string                 `yaml:"primitive" json:"primitive"`
-	With         map[string]interface{} `yaml:"with" json:"with,omitempty"`
-	Source       string                 `yaml:"-" json:"-"` // pack origin, for diagnostics
+	ID    string `yaml:"id" json:"id"`
+	Title string `yaml:"title" json:"title"`
+	// ShortDescription is the friendly label shown in the engine's
+	// per-check progress line (e.g. "[12/65] Open-file limit (os.ulimit.nofile)").
+	// Keep it human-readable, present-tense, and a handful of words
+	// long; admins watching a hung run should be able to tell at a
+	// glance which check is in flight without decoding the dotted ID.
+	// When empty the engine falls back to the ID alone.
+	ShortDescription string                 `yaml:"short_description" json:"short_description,omitempty"`
+	Category         string                 `yaml:"category" json:"category,omitempty"`
+	Tags             []string               `yaml:"tags" json:"tags,omitempty"`
+	AppliesTo        AppliesTo              `yaml:"applies_to" json:"applies_to,omitempty"`
+	RequiresRoot     bool                   `yaml:"requires_root" json:"requires_root,omitempty"`
+	Why              string                 `yaml:"why" json:"why,omitempty"`
+	Remediation      string                 `yaml:"remediation" json:"remediation,omitempty"`
+	References       []string               `yaml:"references" json:"references,omitempty"`
+	Primitive        string                 `yaml:"primitive" json:"primitive"`
+	With             map[string]interface{} `yaml:"with" json:"with,omitempty"`
+	Source           string                 `yaml:"-" json:"-"` // pack origin, for diagnostics
 }
 
 // Categories used for grouping in reports. Free-form strings are accepted in

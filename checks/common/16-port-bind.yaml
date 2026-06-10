@@ -12,6 +12,7 @@ schema_version: 2
 checks:
   - id: net.bind.workbench-8787
     title: Workbench default port 8787 is bindable
+    short_description: Checking Workbench port 8787 is bindable
     category: Networking
     tags: [network, bind, workbench]
     applies_to:
@@ -20,7 +21,8 @@ checks:
       Workbench's rstudio-server listens on 8787 by default. If pev
       can't bind transiently, the install will fail at `systemctl
       start rstudio-server` with a confusing "address already in use"
-      or "permission denied" error.
+      or "permission denied" error. If rstudio-server already owns
+      the port (post-install runs of pev), that counts as PASS.
     remediation: |
       Run `ss -ltnp 'sport = :8787'` to identify the conflicting
       listener. For SELinux: `audit2allow -a` will surface a denial;
@@ -33,9 +35,11 @@ checks:
       host: 0.0.0.0
       port: 8787
       timeout_seconds: 2
+      owned_by: [rstudio-server, rserver]
 
   - id: net.bind.connect-3939
     title: Connect default port 3939 is bindable
+    short_description: Checking Connect port 3939 is bindable
     category: Networking
     tags: [network, bind, connect]
     applies_to:
@@ -43,7 +47,8 @@ checks:
     why: |
       Connect listens on 3939 by default. A bind failure here means
       another process is using the port or selinux is blocking the
-      bind for the unprivileged rstudio-connect user.
+      bind for the unprivileged rstudio-connect user. If
+      rstudio-connect already owns the port, that counts as PASS.
     remediation: |
       `ss -ltnp 'sport = :3939'` to find the conflict; or change the
       port with `Server.Address` in rstudio-connect.gcfg.
@@ -54,16 +59,19 @@ checks:
       host: 0.0.0.0
       port: 3939
       timeout_seconds: 2
+      owned_by: [rstudio-connect, connect]
 
   - id: net.bind.packagemanager-4242
     title: Package Manager default port 4242 is bindable
+    short_description: Checking Package Manager port 4242 is bindable
     category: Networking
     tags: [network, bind, packagemanager]
     applies_to:
       products: [packagemanager]
     why: |
       Package Manager listens on 4242 by default. Bind failure here
-      blocks the install at startup.
+      blocks the install at startup. If rstudio-pm already owns the
+      port, that counts as PASS.
     remediation: |
       `ss -ltnp 'sport = :4242'` to find the conflict; or change the
       port with `Server.Address` in rstudio-pm.gcfg.
@@ -74,3 +82,4 @@ checks:
       host: 0.0.0.0
       port: 4242
       timeout_seconds: 2
+      owned_by: [rstudio-pm]

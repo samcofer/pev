@@ -2,6 +2,7 @@ schema_version: 2
 checks:
   - id: ppm.egress.sync
     title: Package Manager can reach the Posit Package Service
+    short_description: Probing egress to rspm-sync.rstudio.com
     tags: [network, egress, packagemanager]
     applies_to:
       products: [packagemanager]

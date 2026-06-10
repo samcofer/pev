@@ -19,10 +19,11 @@ type Engine struct {
 	Inputs map[string]string
 
 	// Progress, when non-nil, receives one line per check as it runs.
-	// Format: "[i/N] running <id> ...". Useful for stderr output during
-	// long-running primitives (apt update, uv venv, renv install) so the
-	// SE knows pev hasn't hung. Final per-check status is NOT emitted —
-	// that lives in the report.
+	// Format: "[i/N] <short_description> (<id>)" — or "[i/N] <id>" when
+	// the catalog entry hasn't supplied a short_description. Useful for
+	// stderr output during long-running primitives (apt update, uv venv,
+	// renv install) so the SE knows pev hasn't hung. Final per-check
+	// status is NOT emitted — that lives in the report.
 	Progress io.Writer
 }
 
@@ -33,12 +34,42 @@ func (e *Engine) Run(ctx context.Context, all []Check) []Result {
 	out := make([]Result, 0, len(all))
 	for i, c := range all {
 		if e.Progress != nil {
-			fmt.Fprintf(e.Progress, "[%d/%d] %s\n", i+1, len(all), c.ID)
+			label := c.ID
+			if c.ShortDescription != "" {
+				label = fmt.Sprintf("%s (%s)", c.ShortDescription, c.ID)
+			}
+			// Pre-emit a "(skipped)" tag for checks that the engine
+			// will gate out before the primitive even runs. Saves the
+			// SE from wondering why a clearly-not-applicable check
+			// (e.g. a dnf check on Ubuntu) showed up in the progress
+			// stream with no follow-up reason.
+			prefix := ""
+			if willSkip(c, e.Facts) {
+				prefix = "(skipped) "
+			}
+			fmt.Fprintf(e.Progress, "[%d/%d] %s%s\n", i+1, len(all), prefix, label)
 		}
 		out = append(out, e.runOne(ctx, c))
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out
+}
+
+// willSkip mirrors the gating logic at the top of runOne so the progress
+// printer can flag a check before the primitive is dispatched. Kept in
+// sync with runOne's gates: applies_to (os/arch), requires (host facts),
+// and requires_root.
+func willSkip(c Check, hf discover.HostFacts) bool {
+	if !appliesTo(c.AppliesTo, hf) {
+		return true
+	}
+	if missingRequires(c.AppliesTo.Requires, hf) != "" {
+		return true
+	}
+	if c.RequiresRoot && !system.IsRoot() {
+		return true
+	}
+	return false
 }
 
 func (e *Engine) runOne(ctx context.Context, c Check) Result {
