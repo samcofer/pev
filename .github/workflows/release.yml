@@ -20,7 +20,11 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - uses: sigstore/cosign-installer@v4
+      # cosign-installer publishes point releases only — there is no
+      # floating v4 tag, so a bare `@v4` resolves to "no such version"
+      # at action setup time. Pin to the latest v4.x and bump
+      # deliberately when refreshing.
+      - uses: sigstore/cosign-installer@v4.1.2
       - uses: anchore/sbom-action/download-syft@v0
       - uses: goreleaser/goreleaser-action@v7
         with:
