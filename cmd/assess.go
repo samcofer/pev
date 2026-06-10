@@ -76,17 +76,6 @@ func newAssessCmd() *cobra.Command {
 			facts := discover.Gather(ctx)
 			log.WithField("facts", facts).Debug("discovery complete")
 
-			// Resolve selected products. Order of precedence:
-			//   1. --products flag (explicit user override)
-			//   2. --profile flag preset
-			//   3. Auto-detect from rstudio-* binaries (DetectProducts)
-			//   4. Multi-select prompt — only fires when nothing was detected
-			//      and the user did not pass --products / --profile
-			selected := discover.SelectedFromFlag(products, facts.Products)
-			if profile != "" && len(selected) == 0 {
-				selected = profileToProducts(profile)
-			}
-
 			// Pick the prompt mode from CLI flags. --non-interactive wins
 			// over --yes; both fall through to interactive when neither
 			// is set. The interactive driver auto-downgrades to yes when
@@ -100,27 +89,34 @@ func newAssessCmd() *cobra.Command {
 			}
 			driver := prompt.New(mode)
 
+			// Pre-select the multi-select using the precedence chain:
+			//   1. --products flag (explicit user override)
+			//   2. --profile flag preset
+			//   3. Auto-detect from rstudio-* binaries (DetectProducts)
+			//   4. Empty → the "no products" sentinel
+			// The multi-select itself runs every time (interactively, an SE
+			// confirms or amends the pre-selection; --yes / --non-interactive
+			// accept the defaults verbatim per surveyDriver.MultiSelect).
+			preselect := discover.SelectedFromFlag(products, facts.Products)
+			if len(preselect) == 0 && profile != "" {
+				preselect = profileToProducts(profile)
+			}
+			const noneOption = "no products - common system checks only"
+			defaults := preselect
+			if len(defaults) == 0 {
+				defaults = []string{noneOption}
+			}
+			picks, _ := driver.MultiSelect(
+				"Which Posit products will run on this host?",
+				[]string{noneOption, "workbench", "connect", "packagemanager"},
+				defaults,
+			)
+			selected := filterNoneOption(picks, noneOption)
 			if len(selected) == 0 {
-				// "no products" is preselected and is the safe default:
-				// it runs OS / networking / security / sizing /
-				// languages / package-manager health and skips every
-				// product-scoped check. SEs deliberately tick a real
-				// product to enable cert/SMTP/PPM-sync prompts. Ctrl+C
-				// or Esc on the survey aborts with err=ErrSkipped from
-				// the driver, which we treat as "stick with the default."
-				const noneOption = "no products - common system checks only"
-				picks, _ := driver.MultiSelect(
-					"Which Posit products will run on this host?",
-					[]string{noneOption, "workbench", "connect", "packagemanager"},
-					[]string{noneOption},
-				)
-				selected = filterNoneOption(picks, noneOption)
-				if len(selected) == 0 {
-					// Sentinel: no real check uses applies_to.products: [none],
-					// so the catalog filter at internal/checks/filter.go drops
-					// every product-scoped check and only common checks survive.
-					selected = []string{"none"}
-				}
+				// Sentinel: no real check uses applies_to.products: [none],
+				// so the catalog filter at internal/checks/filter.go drops
+				// every product-scoped check and only common checks survive.
+				selected = []string{"none"}
 			}
 
 			inputs := buildInputs(licenseFile, hostnames, idp, facts, selected, driver)
@@ -297,9 +293,10 @@ func buildInputs(
 		promptProductInputs(d, p, in, hostnameOverrides, defaultHost)
 	}
 
-	if wanted["workbench"] {
-		promptIdP(d, idp, in)
-	}
+	// IdP reachability isn't workbench-only — Connect (and any product
+	// that consumes the customer's IdP) benefits from the same probe.
+	// Always offer the prompt; the gate is the confirm inside promptIdP.
+	promptIdP(d, idp, in)
 	if wanted["connect"] {
 		promptSMTP(d, in)
 	}
@@ -310,9 +307,11 @@ func buildInputs(
 	return in
 }
 
-// promptIdP collects the SSO/IdP metadata URL when Workbench is selected.
-// --idp on the CLI bypasses the opt-in confirm prompt; idp="none" forces
-// SKIP. Otherwise the SE picks SAML or OIDC at the prompt.
+// promptIdP collects the SSO/IdP metadata URL. It runs on every assess
+// (any product that consumes the customer's IdP — Workbench and Connect
+// today — benefits from the reachability probe). --idp on the CLI
+// bypasses the opt-in confirm prompt; idp="none" forces SKIP. Otherwise
+// the SE answers a single Yes/No and, if Yes, picks SAML or OIDC.
 func promptIdP(d prompt.Driver, idp string, in map[string]string) {
 	switch {
 	case idp != "" && idp != "none":
@@ -325,7 +324,10 @@ func promptIdP(d prompt.Driver, idp string, in map[string]string) {
 	case idp == "none":
 		in["idp"] = "none"
 	default:
-		ssoWant, _ := d.Confirm("Check Workbench SSO/IdP metadata reachability?", false)
+		ssoWant, _ := d.Confirm(
+			"Check that your IdP's SAML metadata or OIDC well-known configuration is reachable?",
+			false,
+		)
 		if !ssoWant {
 			in["idp"] = "none"
 			return
