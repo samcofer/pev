@@ -1,6 +1,12 @@
 # Primitives reference
 
-A check's `primitive:` field selects which executor runs the check. v1 ships eleven primitives.
+A check's `primitive:` field selects which executor runs the check. The
+catalog registers fifteen primitives at init() time:
+
+- system probes: `cmd`, `file`, `dir`, `pkg`, `sysctl`, `sizing`
+- network probes: `port`, `dns`, `http`, `bind`, `postgres`
+- service-state probes: `systemd`, `selinux`, `apparmor`
+- TLS validation: `x509`
 
 ## `cmd`
 
@@ -120,15 +126,79 @@ with:
 
 `auto` picks `dpkg` on Ubuntu and `rpm` on RHEL family. Provide both Ubuntu and RHEL package names in `any_of` for cross-distro checks.
 
-## `proc`
+## `systemd`
 
-Systemd unit state.
+Systemd unit state. Replaces the older `proc` primitive (deleted; same
+behavior was achievable here with `expect: active`).
 
 ```yaml
-primitive: proc
+primitive: systemd
 with:
   unit: rstudio-server
-  state: active        # any value `systemctl is-<state>` accepts
+  expect: active        # one of: installed | active | inactive | absent
+  timeout_seconds: 5
+```
+
+| Key | Default | Notes |
+|---|---|---|
+| `unit` | — | required, no `.service` suffix |
+| `expect` | `active` | `installed`/`active`/`inactive`/`absent` |
+| `timeout_seconds` | 5 | per `systemctl` call |
+
+## `bind`
+
+Open a TCP listener on `host:port` and immediately close it. PASS means
+the port is bindable; FAIL covers `EADDRINUSE`, missing
+`CAP_NET_BIND_SERVICE` for ports below 1024, or SELinux denies. When the
+expected listener IS already running (a Posit product on its install
+port), the `owned_by` allowlist demotes the in-use error to PASS.
+
+```yaml
+primitive: bind
+with:
+  host: 0.0.0.0          # default; override with the bind address Posit will use
+  port: 8787
+  owned_by: [rstudio-server, rstudio-pm]
+  timeout_seconds: 2
+```
+
+## `postgres`
+
+TCP-connect probe of an external PostgreSQL host. Does NOT issue a SQL
+query — auth/role/database errors surface during the install. Empty
+host SKIPs (the SE didn't supply postgres inputs).
+
+```yaml
+primitive: postgres
+with:
+  host: "{{ .Inputs.postgres_host }}"
+  port: 5432
+  timeout_seconds: 5
+```
+
+## `selinux`
+
+Reports SELinux status by parsing `getenforce`. `expect`: `any` |
+`disabled` | `permissive` | `enforcing` | `absent` | `not_enforcing`.
+
+```yaml
+primitive: selinux
+with:
+  expect: not_enforcing       # PASS for permissive | disabled | absent
+  timeout_seconds: 5
+```
+
+## `apparmor`
+
+Reports AppArmor kernel-module status from
+`/sys/module/apparmor/parameters/enabled`. `expect`: `any` | `enabled` |
+`disabled` | `absent` | `not_enabled`.
+
+```yaml
+primitive: apparmor
+with:
+  expect: not_enabled         # PASS for disabled | absent
+  timeout_seconds: 5
 ```
 
 ## `sysctl`

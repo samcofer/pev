@@ -29,10 +29,7 @@ func runDNS(rc checks.RunCtx) checks.Result {
 	if v, ok := getBool(rc.Check.With, "must_resolve"); ok {
 		mustResolve = v
 	}
-	timeout := 5 * time.Second
-	if t, ok := getInt(rc.Check.With, "timeout_seconds"); ok && t > 0 {
-		timeout = time.Duration(t) * time.Second
-	}
+	timeout := getTimeout(rc.Check.With, 5*time.Second)
 
 	ctx, cancel := context.WithTimeout(rc.Ctx, timeout)
 	defer cancel()

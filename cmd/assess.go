@@ -537,12 +537,12 @@ func promptProductInputs(d prompt.Driver, p productPrompt, in map[string]string,
 		return
 	}
 	cands := discover.ScanSSLCandidates(p.key)
-	certPath := promptPath(d, p.label+" SSL cert", cands.Certs, p.defaultCert)
+	certPath := promptPath(d, p.label+" SSL cert", cands.Certs, p.defaultCert, true)
 	if certPath == "" {
 		return
 	}
 	in[p.key+"_cert"] = certPath
-	in[p.key+"_key"] = promptPathRequired(d, p.label+" SSL key", cands.Keys, p.defaultKey)
+	in[p.key+"_key"] = promptPath(d, p.label+" SSL key", cands.Keys, p.defaultKey, false)
 }
 
 func defaultIdPMetadataURL(kind string) string {
@@ -555,48 +555,39 @@ func defaultIdPMetadataURL(kind string) string {
 	return ""
 }
 
-// promptPath shows a Select dropdown of discovered cert/key candidates plus
-// "(custom path)" and "(skip)" sentinels. Returns the chosen path, or "" to
-// trigger a SKIP downstream. Falls through to a plain Input prompt when no
-// candidates were discovered.
-func promptPath(d prompt.Driver, label string, candidates []string, fallback string) string {
+// promptPath shows a Select dropdown of discovered candidates plus a
+// "(custom path)" sentinel and (when allowSkip) a "(skip)" sentinel.
+// Returns the chosen path, or "" when the SE picked (skip). Falls back to
+// a plain Input prompt when no candidates were discovered.
+//
+// allowSkip=false is for the second half of a cert/key pair: once the SE
+// supplies a cert, the partner key MUST come too — the primitive can't
+// verify pairing without both halves, so leaving the SE no out beats
+// quietly accepting a half-configured prompt.
+func promptPath(d prompt.Driver, label string, candidates []string, fallback string, allowSkip bool) string {
 	const (
 		customSentinel = "(custom path)"
 		skipSentinel   = "(skip)"
 	)
+	inputPrompt := label + " path:"
+	if allowSkip {
+		inputPrompt = label + " path (or 'skip'):"
+	}
 	if len(candidates) == 0 {
-		got, _ := d.Input(label+" path (or 'skip'):", fallback)
+		got, _ := d.Input(inputPrompt, fallback)
 		return got
 	}
 	options := append([]string{}, candidates...)
-	options = append(options, customSentinel, skipSentinel)
+	options = append(options, customSentinel)
+	if allowSkip {
+		options = append(options, skipSentinel)
+	}
 	pick, _ := d.Select(label+" path:", options, candidates[0])
 	switch pick {
 	case skipSentinel:
 		return ""
 	case customSentinel:
-		got, _ := d.Input(label+" path (or 'skip'):", fallback)
-		return got
-	}
-	return pick
-}
-
-// promptPathRequired is promptPath without the (skip) sentinel — used for
-// the second half of a cert/key pair so an SE who entered a cert can't
-// half-configure the prompt by skipping the key. The primitive can't
-// verify pairing without both halves, so returning "" here would just
-// waste the cert path the user already entered.
-func promptPathRequired(d prompt.Driver, label string, candidates []string, fallback string) string {
-	const customSentinel = "(custom path)"
-	if len(candidates) == 0 {
-		got, _ := d.Input(label+" path:", fallback)
-		return got
-	}
-	options := append([]string{}, candidates...)
-	options = append(options, customSentinel)
-	pick, _ := d.Select(label+" path:", options, candidates[0])
-	if pick == customSentinel {
-		got, _ := d.Input(label+" path:", fallback)
+		got, _ := d.Input(inputPrompt, fallback)
 		return got
 	}
 	return pick

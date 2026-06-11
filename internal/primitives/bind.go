@@ -40,10 +40,7 @@ func runBind(rc checks.RunCtx) checks.Result {
 	if h, ok := getString(rc.Check.With, "host"); ok && h != "" {
 		host = h
 	}
-	timeout := 2 * time.Second
-	if t, ok := getInt(rc.Check.With, "timeout_seconds"); ok && t > 0 {
-		timeout = time.Duration(t) * time.Second
-	}
+	timeout := getTimeout(rc.Check.With, 2*time.Second)
 	ownedBy, _ := getStringSlice(rc.Check.With, "owned_by")
 
 	addr := net.JoinHostPort(host, strconv.Itoa(port))

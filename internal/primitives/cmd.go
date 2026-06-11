@@ -51,10 +51,7 @@ func runCmd(rc checks.RunCtx) checks.Result {
 	if !ok || cmd == "" {
 		return unknownf(rc.Check, "missing required `cmd` field")
 	}
-	timeout := 30 * time.Second
-	if t, ok := getInt(rc.Check.With, "timeout_seconds"); ok && t > 0 {
-		timeout = time.Duration(t) * time.Second
-	}
+	timeout := getTimeout(rc.Check.With, 30*time.Second)
 
 	// `as_user` lets a check assert behavior for an unprivileged user
 	// (e.g. `renv::install("renv")` succeeds without sudo). The

@@ -20,22 +20,6 @@ const (
 	ansiDim    = "\033[2m"
 )
 
-// canonicalCategoryOrder is the order categories appear in the terminal
-// output. Categories not in this list sort alphabetically after the known
-// set so the new YAML packs naturally append.
-var canonicalCategoryOrder = []string{
-	checks.CategoryNetworking,
-	checks.CategoryStorage,
-	checks.CategoryOperatingSystem,
-	checks.CategorySecurity,
-	checks.CategoryIdentity,
-	checks.CategorySSL,
-	checks.CategoryPackages,
-	checks.CategorySizing,
-	checks.CategoryProduct,
-	checks.CategoryOther,
-}
-
 // RenderTerminal writes the human-facing summary view to w. Shows the
 // totals table, then per-category sections that include only failing or
 // unknown checks (PASS/SKIP are still in the on-disk Markdown). Output
@@ -176,21 +160,3 @@ func indentMultiline(s, prefix string) string {
 	return b.String()
 }
 
-func categoryOrder(present map[string][]checks.Result) []string {
-	out := []string{}
-	seen := map[string]bool{}
-	for _, c := range canonicalCategoryOrder {
-		if _, ok := present[c]; ok {
-			out = append(out, c)
-			seen[c] = true
-		}
-	}
-	extra := []string{}
-	for c := range present {
-		if !seen[c] {
-			extra = append(extra, c)
-		}
-	}
-	sort.Strings(extra)
-	return append(out, extra...)
-}

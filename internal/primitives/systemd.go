@@ -32,10 +32,7 @@ func runSystemd(rc checks.RunCtx) checks.Result {
 	if e, ok := getString(rc.Check.With, "expect"); ok && e != "" {
 		expect = e
 	}
-	timeout := 5 * time.Second
-	if t, ok := getInt(rc.Check.With, "timeout_seconds"); ok && t > 0 {
-		timeout = time.Duration(t) * time.Second
-	}
+	timeout := getTimeout(rc.Check.With, 5*time.Second)
 
 	r := checks.Result{ID: rc.Check.ID, Title: rc.Check.Title}
 

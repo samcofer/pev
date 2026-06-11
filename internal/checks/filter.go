@@ -27,7 +27,7 @@ func (f Filter) Apply(in []Check) []Check {
 		if len(mustTag) > 0 && !hasAll(c.Tags, mustTag) {
 			continue
 		}
-		if len(productSet) > 0 && len(c.AppliesTo.Products) > 0 && !overlap(c.AppliesTo.Products, productSet) {
+		if len(productSet) > 0 && len(c.AppliesTo.Products) > 0 && !hasAny(c.AppliesTo.Products, productSet) {
 			continue
 		}
 		out = append(out, c)
@@ -62,13 +62,4 @@ func hasAll(list []string, set map[string]struct{}) bool {
 		}
 	}
 	return true
-}
-
-func overlap(list []string, set map[string]struct{}) bool {
-	for _, x := range list {
-		if _, ok := set[x]; ok {
-			return true
-		}
-	}
-	return false
 }

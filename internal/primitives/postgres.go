@@ -1,7 +1,6 @@
 package primitives
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"strconv"
@@ -14,7 +13,7 @@ func init() {
 	checks.Register("postgres", runPostgres, []string{"host", "port", "timeout_seconds"})
 }
 
-// runPostgres probes a PostgreSQL host with TCP + TLS handshake. We do
+// runPostgres probes a PostgreSQL host with a plain TCP connect. We do
 // NOT send a SQL query — that would require a postgres driver in the
 // binary and the actual auth credentials in the catalog. The
 // network-level probe is enough to catch the "Posit can't reach the DB
@@ -35,10 +34,7 @@ func runPostgres(rc checks.RunCtx) checks.Result {
 	if port == 0 {
 		port = 5432
 	}
-	timeout := 5 * time.Second
-	if t, ok := getInt(rc.Check.With, "timeout_seconds"); ok && t > 0 {
-		timeout = time.Duration(t) * time.Second
-	}
+	timeout := getTimeout(rc.Check.With, 5*time.Second)
 
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
 	r := checks.Result{
@@ -47,16 +43,11 @@ func runPostgres(rc checks.RunCtx) checks.Result {
 			Note: fmt.Sprintf("nc -vz %s %d (timeout %s)", host, port, timeout),
 		}},
 	}
-	d := net.Dialer{Timeout: timeout}
-	deadline, cancel := context.WithTimeout(rc.Ctx, timeout)
-	defer cancel()
-	conn, err := d.DialContext(deadline, "tcp", addr)
-	if err != nil {
+	if err := tcpReachable(rc.Ctx, addr, timeout); err != nil {
 		r.Status = checks.StatusFail
 		r.Reason = "tcp dial: " + err.Error()
 		return r
 	}
-	_ = conn.Close()
 	r.Status = checks.StatusPass
 	r.Reason = fmt.Sprintf("reachable on %s", addr)
 	return r

@@ -93,7 +93,7 @@ func renderEnvironment(b *strings.Builder, rep checks.Report) {
 func renderFindings(b *strings.Builder, rep checks.Report) {
 	b.WriteString("## Findings\n\n")
 	byCat := groupByCategory(rep.Results)
-	for _, cat := range categoryOrderFromResults(byCat) {
+	for _, cat := range categoryOrder(byCat) {
 		rs := byCat[cat]
 		fmt.Fprintf(b, "### %s (%d)\n\n", cat, len(rs))
 		for _, r := range rs {
@@ -143,37 +143,6 @@ func groupByCategory(in []checks.Result) map[string][]checks.Result {
 		sort.Slice(out[k], func(i, j int) bool { return out[k][i].ID < out[k][j].ID })
 	}
 	return out
-}
-
-func categoryOrderFromResults(byCat map[string][]checks.Result) []string {
-	known := []string{
-		checks.CategoryNetworking,
-		checks.CategoryStorage,
-		checks.CategoryOperatingSystem,
-		checks.CategorySecurity,
-		checks.CategoryIdentity,
-		checks.CategorySSL,
-		checks.CategoryPackages,
-		checks.CategorySizing,
-		checks.CategoryProduct,
-		checks.CategoryOther,
-	}
-	seen := map[string]bool{}
-	out := []string{}
-	for _, c := range known {
-		if _, ok := byCat[c]; ok {
-			out = append(out, c)
-			seen[c] = true
-		}
-	}
-	extra := []string{}
-	for c := range byCat {
-		if !seen[c] {
-			extra = append(extra, c)
-		}
-	}
-	sort.Strings(extra)
-	return append(out, extra...)
 }
 
 func iconFor(s checks.Status) string {

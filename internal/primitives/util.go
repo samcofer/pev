@@ -7,9 +7,22 @@ package primitives
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/posit-dev/pev/internal/checks"
 )
+
+// getTimeout reads the conventional `timeout_seconds` knob and returns
+// it as a time.Duration; falls back to def when the field is absent or
+// non-positive. Centralized so every primitive has the same template-
+// expansion behavior (string → int via getInt) and bounded-default
+// shape rather than handrolling the dance.
+func getTimeout(m map[string]interface{}, def time.Duration) time.Duration {
+	if t, ok := getInt(m, "timeout_seconds"); ok && t > 0 {
+		return time.Duration(t) * time.Second
+	}
+	return def
+}
 
 // unknownf returns a StatusUnknown Result with a formatted reason. Used when
 // a primitive can't decide because its `with:` payload is malformed at runtime

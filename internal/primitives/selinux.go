@@ -16,10 +16,7 @@ func init() {
 // runSELinux reports SELinux status by parsing `getenforce` (preferred) or
 // `sestatus`. `expect`: any|disabled|permissive|enforcing.
 func runSELinux(rc checks.RunCtx) checks.Result {
-	timeout := 5 * time.Second
-	if t, ok := getInt(rc.Check.With, "timeout_seconds"); ok && t > 0 {
-		timeout = time.Duration(t) * time.Second
-	}
+	timeout := getTimeout(rc.Check.With, 5*time.Second)
 	expect := "any"
 	if e, ok := getString(rc.Check.With, "expect"); ok && e != "" {
 		expect = strings.ToLower(e)
@@ -64,10 +61,7 @@ func runSELinux(rc checks.RunCtx) checks.Result {
 
 // runAppArmor reports AppArmor status. `expect`: any|enabled|disabled|absent|not_enabled.
 func runAppArmor(rc checks.RunCtx) checks.Result {
-	timeout := 5 * time.Second
-	if t, ok := getInt(rc.Check.With, "timeout_seconds"); ok && t > 0 {
-		timeout = time.Duration(t) * time.Second
-	}
+	timeout := getTimeout(rc.Check.With, 5*time.Second)
 	expect := "any"
 	if e, ok := getString(rc.Check.With, "expect"); ok && e != "" {
 		expect = strings.ToLower(e)

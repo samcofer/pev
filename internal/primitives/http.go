@@ -34,10 +34,7 @@ func runHTTP(rc checks.RunCtx) checks.Result {
 	if m, ok := getString(rc.Check.With, "method"); ok && m != "" {
 		method = m
 	}
-	timeout := 5 * time.Second
-	if t, ok := getInt(rc.Check.With, "timeout_seconds"); ok && t > 0 {
-		timeout = time.Duration(t) * time.Second
-	}
+	timeout := getTimeout(rc.Check.With, 5*time.Second)
 	accept, _ := getIntSlice(rc.Check.With, "accept_status")
 
 	r := checks.Result{

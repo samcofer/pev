@@ -1,6 +1,7 @@
 package primitives
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strconv"
@@ -26,10 +27,7 @@ func runPort(rc checks.RunCtx) checks.Result {
 	if !ok || port == 0 {
 		return unknownf(rc.Check, "missing required `port` field")
 	}
-	timeout := 5 * time.Second
-	if t, ok := getInt(rc.Check.With, "timeout_seconds"); ok && t > 0 {
-		timeout = time.Duration(t) * time.Second
-	}
+	timeout := getTimeout(rc.Check.With, 5*time.Second)
 
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
 	r := checks.Result{
@@ -38,14 +36,28 @@ func runPort(rc checks.RunCtx) checks.Result {
 			Note: fmt.Sprintf("nc -vz %s %d (timeout %s)", host, port, timeout),
 		}},
 	}
-	d := net.Dialer{Timeout: timeout}
-	conn, err := d.DialContext(rc.Ctx, "tcp", addr)
-	if err != nil {
+	if err := tcpReachable(rc.Ctx, addr, timeout); err != nil {
 		r.Status = checks.StatusFail
 		r.Reason = "tcp dial: " + err.Error()
 		return r
 	}
-	_ = conn.Close()
 	r.Status = checks.StatusPass
 	return r
+}
+
+// tcpReachable opens and immediately closes a TCP connection to addr,
+// returning nil on success and the dial error otherwise. Centralizes the
+// "is anything listening on host:port" probe shared by the port and
+// postgres primitives — keeps timeout handling and connection cleanup
+// in one place.
+func tcpReachable(ctx context.Context, addr string, timeout time.Duration) error {
+	d := net.Dialer{Timeout: timeout}
+	dialCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	conn, err := d.DialContext(dialCtx, "tcp", addr)
+	if err != nil {
+		return err
+	}
+	_ = conn.Close()
+	return nil
 }

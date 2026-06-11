@@ -14,7 +14,7 @@ body:
     id: primitive
     attributes:
       label: Primitive
-      options: [cmd, file, dir, port, dns, http, x509, pkg, proc, sysctl, sizing]
+      options: [cmd, file, dir, port, dns, http, x509, pkg, sysctl, sizing, bind, postgres, systemd, selinux, apparmor]
     validations: { required: true }
   - type: textarea
     id: why
