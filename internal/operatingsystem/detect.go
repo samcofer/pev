@@ -7,18 +7,15 @@ package operatingsystem
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"strings"
 )
 
 // OS captures the identification we need for catalog gating and report headers.
 type OS struct {
-	ID         string // canonical: ubuntu-22.04 | ubuntu-24.04 | rhel-8 | rhel-9 | rhel-10 | unknown
-	Pretty     string // /etc/os-release PRETTY_NAME, or a synthesized fallback
-	Family     string // ubuntu | rhel | unknown
-	RawID      string // /etc/os-release ID, e.g. ubuntu, rhel, almalinux, rocky, centos, ol
-	RawVersion string // /etc/os-release VERSION_ID, e.g. 22.04 or 9.4
+	ID     string // canonical: ubuntu-22.04 | ubuntu-24.04 | rhel-8 | rhel-9 | rhel-10 | unknown
+	Pretty string // /etc/os-release PRETTY_NAME, or a synthesized fallback
+	Family string // ubuntu | rhel | unknown
 }
 
 // Detect inspects /etc/os-release first (the modern, freedesktop-spec source),
@@ -69,7 +66,7 @@ func normalize(osr map[string]string) OS {
 		pretty = strings.TrimSpace(osr["NAME"] + " " + ver)
 	}
 
-	out := OS{Pretty: pretty, RawID: id, RawVersion: ver}
+	out := OS{Pretty: pretty}
 
 	switch id {
 	case "ubuntu":
@@ -104,11 +101,10 @@ func majorOf(v string) string {
 }
 
 func fromRedhatRelease(s string) OS {
-	out := OS{Family: "rhel", Pretty: strings.TrimSpace(s), RawID: "redhat-release"}
+	out := OS{Family: "rhel", Pretty: strings.TrimSpace(s)}
 	for _, m := range []string{"10", "9", "8"} {
 		if strings.Contains(s, "release "+m) {
 			out.ID = "rhel-" + m
-			out.RawVersion = m
 			return out
 		}
 	}
@@ -129,13 +125,10 @@ func fromIssue(s string) OS {
 				short := parts[0] + "." + parts[1]
 				return OS{
 					ID: "ubuntu-" + short, Family: "ubuntu",
-					Pretty: strings.TrimSpace(s), RawID: "issue", RawVersion: short,
+					Pretty: strings.TrimSpace(s),
 				}
 			}
 		}
 	}
 	return OS{ID: "unknown", Family: "unknown", Pretty: strings.TrimSpace(s)}
 }
-
-// String is convenient for logs.
-func (o OS) String() string { return fmt.Sprintf("%s (%s)", o.ID, o.Pretty) }

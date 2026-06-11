@@ -1,13 +1,12 @@
-// Package cmd holds pev's cobra subcommands. Conventions copied from
-// sol-eng/wbi: persistent --loglevel flag bound via viper, all commands attach
-// under newRootCmd, every subcommand returns a *cobra.Command.
+// Package cmd holds pev's cobra subcommands. The persistent --loglevel and
+// --out-dir flags hang off newRootCmd; subcommands read them via cobra's
+// flag lookup.
 package cmd
 
 import (
 	"embed"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	// Importing primitives wires their init() registration.
 	_ "github.com/posit-dev/pev/internal/primitives"
@@ -45,8 +44,6 @@ report (for humans) and a JSON sidecar (for diffing between runs).`,
 
 	root.PersistentFlags().String("loglevel", "info", "log level (trace|debug|info|warn|error)")
 	root.PersistentFlags().String("out-dir", ".", "directory to write report artifacts into")
-	_ = viper.BindPFlag("loglevel", root.PersistentFlags().Lookup("loglevel"))
-	_ = viper.BindPFlag("out_dir", root.PersistentFlags().Lookup("out-dir"))
 
 	root.AddCommand(newAssessCmd())
 	root.AddCommand(newDiscoverCmd())

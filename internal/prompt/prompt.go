@@ -12,7 +12,6 @@
 package prompt
 
 import (
-	"errors"
 	"os"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -32,10 +31,6 @@ const (
 	// empty default returns "" so the engine SKIPs the dependent check.
 	ModeNonInteractive
 )
-
-// ErrSkipped is returned when the user explicitly typed the magic word "skip"
-// at a prompt. Callers translate this into a "missing input" SKIP downstream.
-var ErrSkipped = errors.New("skipped by user")
 
 // Driver is the prompt frontend; tests inject a fake Driver to avoid TTY work.
 type Driver interface {
@@ -89,8 +84,12 @@ func (s *surveyDriver) Input(question, defaultValue string) (string, error) {
 		return "", err
 	}
 	if out == "skip" {
+		// Magic word "skip" lets the SE bypass a single prompt without
+		// aborting the whole assess. Returning empty triggers the same
+		// "missing input → SKIP the dependent check" path callers
+		// already use when an answer is left blank.
 		logQA(question, "<skipped>")
-		return "", ErrSkipped
+		return "", nil
 	}
 	logQA(question, out)
 	return out, nil

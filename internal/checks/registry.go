@@ -64,16 +64,3 @@ func AllowedKeys(name string) (map[string]struct{}, bool) {
 	k, ok := validKeys[name]
 	return k, ok
 }
-
-// RegisteredPrimitives returns the names of every registered primitive,
-// sorted-friendly insertion order is not preserved; callers that need
-// determinism should sort.
-func RegisteredPrimitives() []string {
-	regMu.RLock()
-	defer regMu.RUnlock()
-	out := make([]string, 0, len(registry))
-	for k := range registry {
-		out = append(out, k)
-	}
-	return out
-}

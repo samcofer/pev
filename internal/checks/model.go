@@ -32,7 +32,6 @@ const (
 type AppliesTo struct {
 	OS       []string `yaml:"os" json:"os,omitempty"`
 	Products []string `yaml:"products" json:"products,omitempty"`
-	Roles    []string `yaml:"roles" json:"roles,omitempty"`
 	Arch     []string `yaml:"arch" json:"arch,omitempty"`
 
 	// Requires lists tooling/language facts that must be true before the
