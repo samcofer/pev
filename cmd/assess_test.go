@@ -48,7 +48,7 @@ func TestRedactSecretsLeavesEmptySecretAsIs(t *testing.T) {
 // Sentinel-alone produces an empty slice; the caller maps that to the
 // "none" string via len(selected) == 0.
 func TestFilterNoneOption(t *testing.T) {
-	const sentinel = "no products - common system checks only"
+	const sentinel = "system configuration checks - product independent"
 	cases := []struct {
 		name string
 		in   []string

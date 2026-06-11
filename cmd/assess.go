@@ -101,7 +101,7 @@ func newAssessCmd() *cobra.Command {
 			if len(preselect) == 0 && profile != "" {
 				preselect = profileToProducts(profile)
 			}
-			const noneOption = "no products - common system checks only"
+			const noneOption = "system configuration checks - product independent"
 			defaults := preselect
 			if len(defaults) == 0 {
 				defaults = []string{noneOption}
