@@ -2,10 +2,11 @@
 //
 //   - interactive (default, requires a TTY) — show the prompt, surface the
 //     discovered default, log both question and answer
-//   - yes — auto-accept the discovered default, log "(auto-accepted)"
-//   - non-interactive — refuse to prompt; if a value isn't already supplied
-//     the caller gets back the empty string and the engine SKIPs the check
-//     with a "missing or invalid input" reason
+//   - yes — silently accept the discovered default, log it as the answer
+//   - non-interactive — same as yes but explicitly opted into via flag; CI
+//     and piped runs use this so missing required inputs SKIP rather than
+//     hang on a TTY-less prompt. Password prompts have no sensible default
+//     and return "" in both yes / non-interactive modes
 //
 // Every prompt logs both question text and final answer through logrus so the
 // pev log file captures the full Q&A trail (mirrors wbi convention).

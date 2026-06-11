@@ -38,3 +38,21 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Self-verify the signature we just produced. If goreleaser's signing
+      # block ever silently regresses (--output-certificate dropped, wrong
+      # artifact selector, etc.) this step fails and the release does NOT
+      # publish the binaries downstream tooling can't verify.
+      - name: Verify cosign signature on checksums
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          checksum="dist/pev_${version}_checksums.txt"
+          test -f "$checksum"          || { echo "no checksums file at $checksum"; exit 1; }
+          test -f "${checksum}.sig"    || { echo "no .sig at ${checksum}.sig"; exit 1; }
+          test -f "${checksum}.pem"    || { echo "no .pem at ${checksum}.pem"; exit 1; }
+          cosign verify-blob \
+            --certificate "${checksum}.pem" \
+            --signature   "${checksum}.sig" \
+            --certificate-identity-regexp "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@.*" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$checksum"

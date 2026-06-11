@@ -59,17 +59,34 @@ jobs:
               ./pev discover
               echo "::endgroup::"
 
+              # python3 ships in every matrix image and powers
+              # test/e2e/validate-report.py — install on demand if a
+              # minimal image omits it.
+              if ! command -v python3 >/dev/null; then
+                if command -v apt-get >/dev/null; then apt-get install -yqq --no-install-recommends python3 >/dev/null
+                elif command -v dnf >/dev/null; then dnf -y install python3 >/dev/null
+                fi
+              fi
+
               echo "::group::pev assess (root, no egress)"
-              # No Posit products are installed in these clean images, so we
-              # expect blocking failures on workbench/connect/ppm presence
-              # checks. We pass --products explicitly so applies_to.products
-              # gates open (auto-detect would otherwise SKIP every per-product
-              # check on a clean image).
+              # No Posit products are installed in these clean images, so
+              # workbench/connect/ppm presence checks fail by design and
+              # the engine exits non-zero. We accept that specific outcome
+              # but still validate report content — a regression that
+              # flips every check to "unknown" (broken primitive registry,
+              # YAML loader crash) would otherwise ship green under the
+              # earlier "test -f *.json" gate.
+              # --products explicitly opens applies_to.products gates;
+              # auto-detect would SKIP every per-product check.
               ./pev assess --non-interactive --products workbench,connect,packagemanager \
-                --out-dir /tmp/pev-root --skip-tags egress || true
+                --out-dir /tmp/pev-root --skip-tags egress \
+                && root_rc=0 || root_rc=$?
+              echo "root assess exited $root_rc"
               ls /tmp/pev-root/
-              test -f /tmp/pev-root/pev-report-*.md
-              test -f /tmp/pev-root/pev-report-*.json
+              root_json=$(ls /tmp/pev-root/pev-report-*.json | head -1)
+              test -n "$root_json" || { echo "no JSON report"; exit 1; }
+              test -f "${root_json%.json}.md" || { echo "no Markdown report"; exit 1; }
+              python3 test/e2e/validate-report.py root "$root_json"
               echo "::endgroup::"
 
               echo "::group::pev assess (non-root, no egress)"
@@ -83,18 +100,17 @@ jobs:
               if command -v runuser >/dev/null; then
                 runuser -u nobody -- /tmp/pev-bin assess --non-interactive \
                   --products workbench,connect,packagemanager \
-                  --out-dir /tmp/pev-nobody --skip-tags egress || true
+                  --out-dir /tmp/pev-nobody --skip-tags egress \
+                  && nr_rc=0 || nr_rc=$?
               else
-                su -s /bin/sh nobody -c "/tmp/pev-bin assess --non-interactive --products workbench,connect,packagemanager --out-dir /tmp/pev-nobody --skip-tags egress" || true
+                su -s /bin/sh nobody -c "/tmp/pev-bin assess --non-interactive --products workbench,connect,packagemanager --out-dir /tmp/pev-nobody --skip-tags egress" \
+                  && nr_rc=0 || nr_rc=$?
               fi
+              echo "non-root assess exited $nr_rc"
               ls /tmp/pev-nobody/
-              test -f /tmp/pev-nobody/pev-report-*.md
-              test -f /tmp/pev-nobody/pev-report-*.json
-              # That the non-root run produced report files is the
-              # contract we care about here — the engine surfaced its
-              # missing-input checks cleanly enough to write them out.
-              # We do NOT inspect report contents because the JSON path
-              # under glob expansion has been flaky in the runner-bash
-              # wrapper (intermittent "no such file" with set -e).
+              nr_json=$(ls /tmp/pev-nobody/pev-report-*.json | head -1)
+              test -n "$nr_json" || { echo "no non-root JSON report"; exit 1; }
+              test -f "${nr_json%.json}.md" || { echo "no non-root Markdown report"; exit 1; }
+              python3 test/e2e/validate-report.py nonroot "$nr_json" "$root_json"
               echo "::endgroup::"
             '

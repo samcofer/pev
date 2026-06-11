@@ -13,6 +13,11 @@
 #   - Detects Linux amd64 / arm64; refuses other platforms.
 #   - Downloads the matching pev_linux_<arch> binary and the published
 #     pev_<version>_checksums.txt; verifies SHA-256 before install.
+#   - When `cosign` is on PATH, also verifies the keyless signature on the
+#     checksums file before trusting any SHA-256. Without cosign the
+#     installer prints a warning and proceeds with SHA-256-only — set
+#     PEV_REQUIRE_COSIGN=1 to make the missing-cosign case a hard error
+#     for regulated installs.
 #   - Always overwrites: re-running upgrades in place.
 #
 # Verifying this script before running it is recommended for regulated
@@ -74,10 +79,38 @@ trap 'rm -rf "$tmp"' EXIT INT TERM
 binary_name="pev_linux_${arch}"
 checksums_name="pev_${version_no_v}_checksums.txt"
 
+sig_name="${checksums_name}.sig"
+cert_name="${checksums_name}.pem"
+
 log "downloading $binary_name ($version)"
 curl -fsSL "${RELEASES_DOWNLOAD}/${version}/${binary_name}"   -o "${tmp}/${binary_name}"
 log "downloading $checksums_name"
 curl -fsSL "${RELEASES_DOWNLOAD}/${version}/${checksums_name}" -o "${tmp}/${checksums_name}"
+
+# Cosign-verify the checksums file before trusting any SHA-256 in it. Without
+# this step, an attacker with control of the GitHub release's binary asset
+# could ship matching checksums and the SHA-256 check would happily pass.
+if command -v cosign >/dev/null 2>&1; then
+  log "downloading $sig_name and $cert_name"
+  if ! curl -fsSL "${RELEASES_DOWNLOAD}/${version}/${sig_name}"  -o "${tmp}/${sig_name}"; then
+    err "cosign signature ${sig_name} not found at release — refusing to install"
+  fi
+  if ! curl -fsSL "${RELEASES_DOWNLOAD}/${version}/${cert_name}" -o "${tmp}/${cert_name}"; then
+    err "cosign certificate ${cert_name} not found at release — refusing to install"
+  fi
+  log "verifying cosign signature on ${checksums_name}"
+  cosign verify-blob \
+    --certificate "${tmp}/${cert_name}" \
+    --signature "${tmp}/${sig_name}" \
+    --certificate-identity-regexp "https://github.com/${REPO}/.github/workflows/release.yml@.*" \
+    --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+    "${tmp}/${checksums_name}" >/dev/null \
+    || err "cosign verification failed for ${checksums_name} — refusing to install"
+elif [ "${PEV_REQUIRE_COSIGN:-0}" = "1" ]; then
+  err "cosign not on PATH and PEV_REQUIRE_COSIGN=1 — install cosign or unset the variable"
+else
+  log "warning: cosign not on PATH; falling back to SHA-256 only (set PEV_REQUIRE_COSIGN=1 to hard-fail)"
+fi
 
 # sha256sum -c needs the checksum line in its CWD-relative form. We grep the
 # row for our binary, then run -c against just that row.

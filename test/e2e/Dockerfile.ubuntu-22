@@ -1,6 +1,0 @@
-FROM ubuntu:22.04
-RUN apt-get update -qq \
- && apt-get install -yqq --no-install-recommends \
-      ca-certificates curl iproute2 procps openssl \
- && rm -rf /var/lib/apt/lists/*
-WORKDIR /work

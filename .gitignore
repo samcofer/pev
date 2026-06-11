@@ -22,3 +22,7 @@ pev-log-*.log
 
 # OS
 .DS_Store
+
+# Python (test/e2e/validate-report.py byproducts)
+__pycache__/
+*.pyc

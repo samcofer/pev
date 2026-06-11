@@ -14,13 +14,12 @@ permissions:
 # CodeQL needs the repository's "Code scanning" feature to be enabled in
 # Settings → Code security to upload SARIF results. On a fresh fork or a
 # personal repo this is off by default; the workflow runs successfully but
-# the upload step errors out. We mark the analyze step continue-on-error so
-# the workflow itself stays green; once code scanning is enabled the run
-# starts publishing results without further changes.
+# the SARIF-upload step inside analyze@v4 errors out. We soft-fail only
+# that step so init/autobuild failures still block the job — those are
+# real CodeQL regressions, not the "code scanning is off" config gap.
 jobs:
   analyze:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
       - uses: github/codeql-action/init@v4
@@ -28,3 +27,4 @@ jobs:
           languages: go
       - uses: github/codeql-action/autobuild@v4
       - uses: github/codeql-action/analyze@v4
+        continue-on-error: true

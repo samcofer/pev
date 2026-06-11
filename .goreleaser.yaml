@@ -33,7 +33,10 @@ sboms:
   - artifacts: archive
 
 # Cosign keyless signing of the checksums file (the binaries are verified
-# transitively via the signed checksum file).
+# transitively via the signed checksum file). We emit BOTH the .sig and
+# the .pem certificate alongside the artifact — `cosign verify-blob`
+# needs the cert to validate the chain when the signature was generated
+# with keyless OIDC, and the README's verification steps reference both.
 signs:
   - cmd: cosign
     artifacts: checksum
@@ -42,6 +45,7 @@ signs:
       - sign-blob
       - "--yes"
       - "--output-signature=${signature}"
+      - "--output-certificate=${certificate}"
       - "${artifact}"
 
 release:
