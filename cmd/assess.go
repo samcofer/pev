@@ -453,8 +453,9 @@ func redactSecrets(in map[string]string) map[string]string {
 // result. Real products win — if the SE ticked workbench alongside the
 // sentinel (typical when the menu pre-selected "no products" and the SE
 // adds a product without first toggling the sentinel off), the sentinel
-// is dropped and only the real products survive. Returns nil only when
-// the sentinel was the sole pick, signaling common-only.
+// is dropped and only the real products survive. Sentinel-alone returns
+// an empty slice; callers detect that via len() and fold it into the
+// common-only "none" signal.
 func filterNoneOption(picks []string, sentinel string) []string {
 	out := make([]string, 0, len(picks))
 	for _, p := range picks {

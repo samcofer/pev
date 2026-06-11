@@ -36,3 +36,38 @@ func TestInteractiveDowngradesWithoutTTY(t *testing.T) {
 		t.Fatalf("want default, got %q", got)
 	}
 }
+
+// TestPasswordReturnsEmptyInNonInteractive locks in the secret-handling
+// contract called out in CLAUDE.md §8 / cmd/assess.secretInputKeys: a
+// password has no sensible auto-default, so callers must treat the
+// empty return as "skip the dependent check" rather than fall through
+// with a fake secret. ModeYes shares the same return so CI runs and
+// piped sessions never end up holding a phony password.
+func TestPasswordReturnsEmptyInNonInteractive(t *testing.T) {
+	for _, mode := range []Mode{ModeYes, ModeNonInteractive} {
+		d := New(mode)
+		got, err := d.Password("PostgreSQL password:")
+		if err != nil {
+			t.Fatalf("mode=%v: %v", mode, err)
+		}
+		if got != "" {
+			t.Fatalf("mode=%v: password should be empty, got %q (would leak as a real secret)", mode, got)
+		}
+	}
+}
+
+// TestInteractiveTTY-less downgrades to ModeYes (covered above) so
+// Password() in interactive-mode-without-a-TTY MUST also return "".
+// Belt-and-braces for the secret path: this is the path real CI
+// pipelines exercise when they run pev without --non-interactive but
+// without a controlling tty.
+func TestPasswordReturnsEmptyInInteractiveWithoutTTY(t *testing.T) {
+	d := New(ModeInteractive)
+	got, err := d.Password("PostgreSQL password:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "" {
+		t.Fatalf("interactive-without-tty Password should return empty, got %q", got)
+	}
+}
