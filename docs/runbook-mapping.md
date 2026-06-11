@@ -25,7 +25,7 @@ checks apply to any host running Workbench, Connect, or Package Manager.
 | Outbound networking — license activation | `net.egress.license-activation` |
 | Outbound networking — package mirrors | `net.egress.packagemanager-posit-ping`, `net.egress.p3m`, `net.egress.cran`, `net.egress.bioconductor`, `net.egress.pypi`, `net.egress.pypi-files` |
 | Distro package manager healthy | `pkg-mgr.apt.update`, `pkg-mgr.apt.repolist-fresh`, `pkg-mgr.dnf.repolist`, `pkg-mgr.dnf.makecache` |
-| System dependencies (build deps for R/Python packages) | `pkg.openssl-dev`, `pkg.libcurl-dev`, `pkg.libxml2-dev`, `pkg.gdebi.ubuntu` |
+| System dependencies (build deps for R/Python packages) | `pkg.openssl-dev`, `pkg.libcurl-dev`, `pkg.libxml2-dev` |
 | Posit Pro Drivers installed (when declared) | `pkg.pro-drivers.installed` |
 | Security posture (umask, SELinux/AppArmor, firewalls) | `sec.umask.permissive`, `sec.selinux.not-enforcing`, `sec.apparmor.not-enabled`, `sec.firewalld.inactive`, `sec.firewalld.posit-ports-allowed`, `sec.iptables.inactive`, `sec.iptables.posit-ports-allowed`, `sec.nftables.inactive`, `sec.nftables.posit-ports-allowed` |
 | R installed under `/opt/R/<version>` | `lang.r.versioned-install` |

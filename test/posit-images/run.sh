@@ -20,12 +20,10 @@ CONNECT_IMAGE="docker.io/posit/connect@sha256:8de3d13ba5fdd46576ecdcbdff43420305
 # .github/workflows/posit-images.yml. Anything fail/unknown NOT in the
 # allowlist is treated as a regression and fails the run.
 WORKBENCH_ALLOWED=$(cat <<'EOF'
-pkg.gdebi.ubuntu
 storage.acl.posix.home-and-local
 EOF
 )
 CONNECT_ALLOWED=$(cat <<'EOF'
-pkg.gdebi.ubuntu
 pkg.libcurl-dev
 pkg.libxml2-dev
 connect.smtp.reachable

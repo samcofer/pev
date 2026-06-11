@@ -176,7 +176,6 @@ The full built-in catalog (run `pev list-checks` for the live version):
 
 | ID | Title |
 |---|---|
-| `pkg.gdebi.ubuntu` | gdebi-core installed (Ubuntu) |
 | `pkg.openssl-dev` | openssl development headers installed |
 | `pkg.libcurl-dev` | libcurl development headers installed |
 | `pkg.libxml2-dev` | libxml2 development headers installed |

@@ -1,20 +1,5 @@
 schema_version: 2
 checks:
-  - id: pkg.gdebi.ubuntu
-    title: gdebi-core installed (Ubuntu)
-    short_description: Checking gdebi-core is installed (Ubuntu)
-    tags: [packages, ubuntu]
-    applies_to:
-      os: [ubuntu-22.04, ubuntu-24.04]
-    why: |
-      gdebi resolves dependencies when installing the .deb packages for
-      Workbench, Connect, and Package Manager. Without it, dpkg installs
-      can fail mid-flight and leave the system half-configured.
-    primitive: pkg
-    with:
-      manager: dpkg
-      any_of: [gdebi-core]
-
   - id: pkg.openssl-dev
     title: openssl development headers installed
     short_description: Checking openssl development headers are installed

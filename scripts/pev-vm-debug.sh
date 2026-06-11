@@ -25,4 +25,4 @@ echo; echo "=== 5) renv install as ubuntu ==="
 runuser -u ubuntu -- sh -c 'cd && D=$(mktemp -d) && /opt/R/4.5.2/bin/R --vanilla --no-save --slave -e "install.packages(\"renv\", repos=\"https://packagemanager.posit.co/cran/__linux__/noble/latest\", lib=\"$D\"); library(\"renv\", lib.loc=\"$D\")" 2>&1 | tail -20; rm -rf "$D"'
 
 echo; echo "=== 6) packages ==="
-dpkg -l gdebi-core libcurl4-openssl-dev libxml2-dev 2>&1 | tail -10
+dpkg -l libssl-dev libcurl4-openssl-dev libxml2-dev 2>&1 | tail -10

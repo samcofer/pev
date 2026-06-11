@@ -38,13 +38,11 @@ jobs:
             image: docker.io/posit/workbench@sha256:3d76d4b38651287d158c59fe82fc7e7d5bb8de1a1178a922bd50a90892d0d87a
             # Expected fails on the stock workbench image. Update with care.
             #   pkg-mgr.apt.repolist-fresh        — apt lists are baked at image-build time and age past 30d
-            #   pkg.gdebi.ubuntu                  — image ships without gdebi-core
             #   sec.apparmor.not-enabled          — runner host has AppArmor enabled; check observes the host kernel
             #   sizing.workbench.minimum          — GH runner is below the 100 GB / 4 GB customer minimum
             #   storage.acl.posix.home-and-local  — image ships without acl/setfacl
             allowed_unexpected: |
               pkg-mgr.apt.repolist-fresh
-              pkg.gdebi.ubuntu
               sec.apparmor.not-enabled
               sizing.workbench.minimum
               storage.acl.posix.home-and-local
@@ -52,7 +50,6 @@ jobs:
             image: docker.io/posit/connect@sha256:8de3d13ba5fdd46576ecdcbdff43420305407192d2c0de462545eba1ba082de9
             # Expected fails on the stock connect image. Update with care.
             #   pkg-mgr.apt.repolist-fresh — apt lists are baked at image-build time and age past 30d
-            #   pkg.gdebi.ubuntu           — image ships without gdebi-core
             #   pkg.libcurl-dev            — build-deps for analytics packages not pre-installed
             #   pkg.libxml2-dev            — same
             #   sec.apparmor.not-enabled   — runner host has AppArmor enabled; check observes the host kernel
@@ -61,7 +58,6 @@ jobs:
             #   connect.smtp.reachable     — UNKNOWN: no smtp host supplied
             allowed_unexpected: |
               pkg-mgr.apt.repolist-fresh
-              pkg.gdebi.ubuntu
               pkg.libcurl-dev
               pkg.libxml2-dev
               sec.apparmor.not-enabled
