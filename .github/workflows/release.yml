@@ -20,11 +20,15 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      # cosign-installer publishes point releases only — there is no
-      # floating v4 tag, so a bare `@v4` resolves to "no such version"
-      # at action setup time. Pin to the latest v4.x and bump
-      # deliberately when refreshing.
-      - uses: sigstore/cosign-installer@v4.1.2
+      # cosign-installer publishes point releases only (no floating @v4
+      # tag exists). Pin to v3.10.1: cosign-installer v4.x defaults
+      # `--new-bundle-format` on, which silently ignores the
+      # `--output-signature` flag goreleaser still uses and then errors
+      # out because no `--bundle` path was set. v3.10.1 ships the
+      # previous cosign release where `--output-signature` produces the
+      # same .sig blob the README's verify instructions reference. Bump
+      # deliberately along with .goreleaser.yaml when refreshing.
+      - uses: sigstore/cosign-installer@v3.10.1
       - uses: anchore/sbom-action/download-syft@v0
       - uses: goreleaser/goreleaser-action@v7
         with:
