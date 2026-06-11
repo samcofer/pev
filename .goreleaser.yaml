@@ -37,9 +37,15 @@ sboms:
 # the .pem certificate alongside the artifact — `cosign verify-blob`
 # needs the cert to validate the chain when the signature was generated
 # with keyless OIDC, and the README's verification steps reference both.
+#
+# `certificate:` MUST be set explicitly: without it goreleaser doesn't
+# track the .pem produced by --output-certificate, so the file lands in
+# dist/ but is never uploaded as a release asset. The release.yml
+# self-verify step caught this regression on v0.0.4.
 signs:
   - cmd: cosign
     artifacts: checksum
+    certificate: "${artifact}.pem"
     output: true
     args:
       - sign-blob
