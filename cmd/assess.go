@@ -293,6 +293,16 @@ func buildInputs(
 		promptProductInputs(d, p, in, hostnameOverrides, defaultHost)
 	}
 
+	// In common-only mode (no real products selected) every follow-up
+	// below targets a product-specific concern — IdP reachability, an
+	// external Postgres, PAM/SSO test users, Pro Drivers, an NFS-backed
+	// home share. None of them apply to a bare host sanity sweep, so
+	// skip the prompts. The dependent common checks SKIP cleanly for
+	// missing inputs, which is the right outcome here.
+	if wanted["none"] {
+		return in
+	}
+
 	// IdP reachability isn't workbench-only — Connect (and any product
 	// that consumes the customer's IdP) benefits from the same probe.
 	// Always offer the prompt; the gate is the confirm inside promptIdP.
@@ -440,14 +450,16 @@ func redactSecrets(in map[string]string) map[string]string {
 }
 
 // filterNoneOption strips the "no products" sentinel from a multi-select
-// result. If the sentinel was picked alongside a real product, the
-// sentinel wins — explicit "no products" beats accidental ticks. Returns
-// nil to signal common-only.
+// result. Real products win — if the SE ticked workbench alongside the
+// sentinel (typical when the menu pre-selected "no products" and the SE
+// adds a product without first toggling the sentinel off), the sentinel
+// is dropped and only the real products survive. Returns nil only when
+// the sentinel was the sole pick, signaling common-only.
 func filterNoneOption(picks []string, sentinel string) []string {
 	out := make([]string, 0, len(picks))
 	for _, p := range picks {
 		if p == sentinel {
-			return nil
+			continue
 		}
 		out = append(out, p)
 	}
