@@ -90,17 +90,20 @@ func TestMissingRequires(t *testing.T) {
 		// First-missing-wins: r missing AND python missing → "r"
 		// surfaces because it appears first in the requires slice.
 		// Stable order makes the SKIP reason deterministic.
-		{"first missing wins",
+		{
+			"first missing wins",
 			[]string{"r", "python"},
 			discover.HostFacts{},
 			"r",
 		},
-		{"unknown token defaults to satisfied",
+		{
+			"unknown token defaults to satisfied",
 			[]string{"future-token-that-does-not-exist"},
 			discover.HostFacts{},
 			"",
 		},
-		{"all satisfied",
+		{
+			"all satisfied",
 			[]string{"r", "python", "uv", "apt"},
 			discover.HostFacts{
 				R: []string{"4.4"}, Python: []string{"3.12"},

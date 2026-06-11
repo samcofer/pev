@@ -55,15 +55,18 @@ func TestFilterNoneOption(t *testing.T) {
 		want []string
 	}{
 		{"sentinel alone leaves no real picks", []string{sentinel}, []string{}},
-		{"real products beat sentinel",
+		{
+			"real products beat sentinel",
 			[]string{sentinel, "workbench"},
 			[]string{"workbench"},
 		},
-		{"sentinel mixed with multiple products",
+		{
+			"sentinel mixed with multiple products",
 			[]string{"workbench", sentinel, "connect"},
 			[]string{"workbench", "connect"},
 		},
-		{"no sentinel, all real",
+		{
+			"no sentinel, all real",
 			[]string{"workbench", "connect"},
 			[]string{"workbench", "connect"},
 		},

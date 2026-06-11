@@ -159,4 +159,3 @@ func indentMultiline(s, prefix string) string {
 	}
 	return b.String()
 }
-

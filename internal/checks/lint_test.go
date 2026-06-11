@@ -103,7 +103,7 @@ func TestLint_AcceptsAnticipatoryUbuntu2604(t *testing.T) {
 func TestLint_CleanCheckProducesNoErrors(t *testing.T) {
 	errs := Lint([]Check{{
 		ID: "x.y.z", Title: "t", Why: "w", Primitive: "__lint_test__",
-		With: map[string]interface{}{"foo": "ok"},
+		With:      map[string]interface{}{"foo": "ok"},
 		AppliesTo: AppliesTo{OS: []string{"rhel-9"}},
 	}})
 	if len(errs) != 0 {
