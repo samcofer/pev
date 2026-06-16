@@ -175,7 +175,7 @@ checks:
       cmd: |
         path={{ .Inputs.home_share_path }}
         if [ -z "$path" ]; then
-          echo "no home_share_path input; skipping"
+          echo "no NFS home share declared (home_share_path input is empty)"
           exit 2
         fi
         if ! mnt=$(findmnt -T "$path" -no SOURCE,FSTYPE,OPTIONS 2>/dev/null); then
@@ -214,7 +214,7 @@ checks:
       cmd: |
         path={{ .Inputs.home_share_path }}
         if [ -z "$path" ]; then
-          echo "no home_share_path input; skipping"
+          echo "no NFS home share declared (home_share_path input is empty)"
           exit 2
         fi
         # Match the exact mountpoint as the second whitespace-separated
@@ -250,7 +250,7 @@ checks:
       cmd: |
         u={{ .Inputs.pam_test_user }}
         if [ -z "$u" ]; then
-          echo "no pam_test_user input; skipping"
+          echo "no PAM/SSO test user declared (pam_test_user input is empty)"
           exit 2
         fi
         if entry=$(getent passwd "$u"); then
@@ -285,7 +285,7 @@ checks:
       cmd: |
         want={{ .Inputs.use_pro_drivers }}
         if [ "$want" != "yes" ]; then
-          echo "Pro Drivers not declared; skipping"
+          echo "Pro Drivers not declared (use_pro_drivers input is not yes)"
           exit 2
         fi
         if command -v dpkg >/dev/null; then

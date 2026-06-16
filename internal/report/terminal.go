@@ -99,6 +99,51 @@ func RenderTerminal(w io.Writer, rep checks.Report, color bool) {
 	}
 }
 
+// RenderSkipped writes a skip-review view to w: the same per-category
+// shape as the failure summary, but listing SKIPPED checks with their
+// skip reason. Used by `pev assess --review-skipped` so an SE can audit
+// what the run *didn't* test — a declined prompt, an inapplicable OS, a
+// missing language runtime — without opening the on-disk Markdown. The
+// totals/environment header is owned by RenderTerminal; this function
+// renders only the skip sections so it can be appended after it.
+func RenderSkipped(w io.Writer, rep checks.Report, color bool) {
+	yellow := func(s string) string { return wrap(s, ansiYellow, color) }
+	bold := func(s string) string { return wrap(s, ansiBold, color) }
+	dim := func(s string) string { return wrap(s, ansiDim, color) }
+
+	byCat := map[string][]checks.Result{}
+	for _, r := range rep.Results {
+		if r.Status != checks.StatusSkip {
+			continue
+		}
+		byCat[r.Category] = append(byCat[r.Category], r)
+	}
+	if len(byCat) == 0 {
+		fmt.Fprintln(w, dim("No checks were skipped."))
+		return
+	}
+
+	fmt.Fprintf(w, "%s\n\n", bold(fmt.Sprintf("Skipped checks (%d)", rep.Summary.Skip)))
+	for _, cat := range categoryOrder(byCat) {
+		rs := byCat[cat]
+		sort.Slice(rs, func(i, j int) bool { return rs[i].ID < rs[j].ID })
+		fmt.Fprintf(w, "%s (%d skipped)\n", bold(cat), len(rs))
+		for _, r := range rs {
+			line := fmt.Sprintf("  %s\t%s\t%s", "[SKIP]", r.ID, r.Title)
+			fmt.Fprintln(w, yellow(line))
+			reason := r.Reason
+			if reason == "" {
+				reason = "no reason recorded"
+			}
+			fmt.Fprintf(w, "    %s %s\n", yellow("reason:"), reason)
+			if r.Why != "" {
+				fmt.Fprintf(w, "    %s %s\n", dim("why:"), oneLine(r.Why))
+			}
+		}
+		fmt.Fprintln(w)
+	}
+}
+
 // renderTerminalEnvironment prints the Environment block on stdout, the
 // same shape as `pev discover`. SEs use it as a quick one-line "what is
 // this host" reference before scanning failures. Mirrors the on-disk

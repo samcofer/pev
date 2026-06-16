@@ -2,6 +2,7 @@ package checks
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/posit-dev/pev/internal/discover"
@@ -25,6 +26,45 @@ func TestEngineSkipsOnAppliesTo(t *testing.T) {
 	r := e.runOne(context.Background(), c)
 	if r.Status != StatusSkip {
 		t.Fatalf("want skip, got %s", r.Status)
+	}
+	// The reason must name both the host's actual OS and the targets so
+	// --review-skipped is self-explanatory.
+	if !strings.Contains(r.Reason, "rhel-9") || !strings.Contains(r.Reason, "ubuntu-22.04") {
+		t.Fatalf("skip reason should name host OS and targets, got %q", r.Reason)
+	}
+}
+
+// TestAppliesTo covers the OS/arch gate's reason strings directly,
+// including the empty-fact ("unknown") fallback.
+func TestAppliesTo(t *testing.T) {
+	cases := []struct {
+		name       string
+		a          AppliesTo
+		hf         discover.HostFacts
+		wantApply  bool   // true = applies (reason "")
+		wantSubstr string // substring required in the skip reason
+	}{
+		{"no gate applies", AppliesTo{}, discover.HostFacts{OS: "rhel-9"}, true, ""},
+		{"os match applies", AppliesTo{OS: []string{"rhel-9"}}, discover.HostFacts{OS: "rhel-9"}, true, ""},
+		{"os mismatch skips", AppliesTo{OS: []string{"rhel-9", "rhel-10"}}, discover.HostFacts{OS: "ubuntu-26.04"}, false, "ubuntu-26.04"},
+		{"arch mismatch skips", AppliesTo{Arch: []string{"amd64"}}, discover.HostFacts{Arch: "arm64"}, false, "arm64"},
+		{"empty os fact labelled unknown", AppliesTo{OS: []string{"rhel-9"}}, discover.HostFacts{}, false, "unknown"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := appliesTo(tc.a, tc.hf)
+			if tc.wantApply && got != "" {
+				t.Fatalf("want applies (empty reason), got %q", got)
+			}
+			if !tc.wantApply {
+				if got == "" {
+					t.Fatalf("want skip reason, got empty")
+				}
+				if !strings.Contains(got, tc.wantSubstr) {
+					t.Fatalf("reason %q should contain %q", got, tc.wantSubstr)
+				}
+			}
+		})
 	}
 }
 

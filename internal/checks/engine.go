@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 	"text/template"
 	"time"
 
@@ -60,7 +61,7 @@ func (e *Engine) Run(ctx context.Context, all []Check) []Result {
 // sync with runOne's gates: applies_to (os/arch), requires (host facts),
 // and requires_root.
 func willSkip(c Check, hf discover.HostFacts) bool {
-	if !appliesTo(c.AppliesTo, hf) {
+	if appliesTo(c.AppliesTo, hf) != "" {
 		return true
 	}
 	if missingRequires(c.AppliesTo.Requires, hf) != "" {
@@ -76,16 +77,17 @@ func (e *Engine) runOne(ctx context.Context, c Check) Result {
 	start := time.Now()
 	base := Result{
 		ID: c.ID, Title: c.Title,
-		Why: c.Why, References: c.References,
+		Category: CategoryFor(c),
+		Why:      c.Why, References: c.References,
 	}
 	finish := func(r Result) Result {
 		r.DurationMS = time.Since(start).Milliseconds()
 		return r
 	}
 
-	if !appliesTo(c.AppliesTo, e.Facts) {
+	if reason := appliesTo(c.AppliesTo, e.Facts); reason != "" {
 		base.Status = StatusSkip
-		base.Reason = "does not apply to this host"
+		base.Reason = reason
 		return finish(base)
 	}
 	if missing := missingRequires(c.AppliesTo.Requires, e.Facts); missing != "" {
@@ -130,18 +132,33 @@ func (e *Engine) runOne(ctx context.Context, c Check) Result {
 
 // appliesTo matches a Check's AppliesTo gate against host facts. An empty
 // list for a dimension is "any" — only non-empty lists are restrictive.
+// Returns "" when the check applies, or a specific, SE-facing skip reason
+// naming the dimension, the host's actual value, and what the check
+// requires — so `--review-skipped` shows "this host is ubuntu-26.04; check
+// targets rhel-8, rhel-9, rhel-10" rather than a bare "does not apply".
 //
 // Product gating is intentionally absent here: it lives in Filter.Apply
 // (internal/checks/filter.go), which the assess command runs before
 // handing the surviving checks to the engine.
-func appliesTo(a AppliesTo, hf discover.HostFacts) bool {
+func appliesTo(a AppliesTo, hf discover.HostFacts) string {
 	if len(a.OS) > 0 && !contains(a.OS, hf.OS) {
-		return false
+		return fmt.Sprintf("this host is %s; check targets %s",
+			orUnknown(hf.OS), strings.Join(a.OS, ", "))
 	}
 	if len(a.Arch) > 0 && !contains(a.Arch, hf.Arch) {
-		return false
+		return fmt.Sprintf("this host is %s; check targets %s",
+			orUnknown(hf.Arch), strings.Join(a.Arch, ", "))
 	}
-	return true
+	return ""
+}
+
+// orUnknown labels an empty fact value so a skip reason never reads
+// "this host is ; check targets ...".
+func orUnknown(s string) string {
+	if s == "" {
+		return "unknown"
+	}
+	return s
 }
 
 func contains(set []string, s string) bool {

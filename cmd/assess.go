@@ -43,6 +43,7 @@ func newAssessCmd() *cobra.Command {
 		tagsAny        []string
 		skipTags       []string
 		skipChecks     []string
+		reviewSkipped  bool
 	)
 	c := &cobra.Command{
 		Use:   "assess",
@@ -201,6 +202,16 @@ func newAssessCmd() *cobra.Command {
 			fmt.Println()
 			report.RenderTerminal(os.Stdout, rep, isTerminal(os.Stdout))
 
+			// --review-skipped appends a skip audit after the failure
+			// summary: every SKIPPED check with its reason, grouped by
+			// category. Lets an SE confirm a declined prompt or an
+			// inapplicable check skipped for the expected reason without
+			// opening the on-disk Markdown.
+			if reviewSkipped {
+				fmt.Println()
+				report.RenderSkipped(os.Stdout, rep, isTerminal(os.Stdout))
+			}
+
 			if rep.Summary.Fail > 0 {
 				return fmt.Errorf("%d failure(s) — see report", rep.Summary.Fail)
 			}
@@ -220,6 +231,7 @@ func newAssessCmd() *cobra.Command {
 	c.Flags().StringSliceVar(&tagsAny, "tags", nil, "only run checks tagged with ALL of these")
 	c.Flags().StringSliceVar(&skipTags, "skip-tags", nil, "skip checks tagged with any of these")
 	c.Flags().StringSliceVar(&skipChecks, "skip-checks", nil, "skip checks by ID")
+	c.Flags().BoolVar(&reviewSkipped, "review-skipped", false, "after the summary, list skipped checks with their skip reason")
 	return c
 }
 
