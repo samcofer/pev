@@ -176,7 +176,7 @@ checks:
         path={{ .Inputs.home_share_path }}
         if [ -z "$path" ]; then
           echo "no home_share_path input; skipping"
-          exit 0
+          exit 2
         fi
         if ! mnt=$(findmnt -T "$path" -no SOURCE,FSTYPE,OPTIONS 2>/dev/null); then
           echo "$path is not mounted (findmnt found no entry)"
@@ -193,6 +193,7 @@ checks:
         rm -f "$f"
         echo "$path is mounted writable"
       expect_exit: 0
+      skip_exit: 2
       timeout_seconds: 10
 
   - id: storage.home.fstab-persistent
@@ -214,7 +215,7 @@ checks:
         path={{ .Inputs.home_share_path }}
         if [ -z "$path" ]; then
           echo "no home_share_path input; skipping"
-          exit 0
+          exit 2
         fi
         # Match the exact mountpoint as the second whitespace-separated
         # field. Avoids false positives where the share path is
@@ -226,6 +227,7 @@ checks:
         echo "no /etc/fstab entry mounts $path (the current mount will not survive reboot)"
         exit 1
       expect_exit: 0
+      skip_exit: 2
       timeout_seconds: 5
 
   - id: auth.pam.users-resolvable
@@ -249,7 +251,7 @@ checks:
         u={{ .Inputs.pam_test_user }}
         if [ -z "$u" ]; then
           echo "no pam_test_user input; skipping"
-          exit 0
+          exit 2
         fi
         if entry=$(getent passwd "$u"); then
           echo "$entry"
@@ -259,6 +261,7 @@ checks:
         echo "user '$u' did not resolve via getent passwd (PAM/nsswitch is not finding it)"
         exit 1
       expect_exit: 0
+      skip_exit: 2
       timeout_seconds: 10
 
   - id: pkg.pro-drivers.installed
@@ -283,7 +286,7 @@ checks:
         want={{ .Inputs.use_pro_drivers }}
         if [ "$want" != "yes" ]; then
           echo "Pro Drivers not declared; skipping"
-          exit 0
+          exit 2
         fi
         if command -v dpkg >/dev/null; then
           dpkg -l rstudio-drivers 2>/dev/null | grep -q '^ii' && exit 0
@@ -294,4 +297,5 @@ checks:
         echo "rstudio-drivers package not installed"
         exit 1
       expect_exit: 0
+      skip_exit: 2
       timeout_seconds: 10

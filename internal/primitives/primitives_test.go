@@ -201,6 +201,21 @@ func TestX509MissingCertField(t *testing.T) {
 	}
 }
 
+// TestX509EmptyCertPathSkips proves the SE-declined-prompt path: when the
+// cert_path key is present but expands to "" (the SE answered No to "Check
+// <product> SSL certificate?", leaving {{ .Inputs.<product>_cert }} empty),
+// the check SKIPs rather than surfacing a noisy UNKNOWN.
+func TestX509EmptyCertPathSkips(t *testing.T) {
+	c := checks.Check{
+		ID: "x", Title: "x", Primitive: "x509",
+		With: map[string]interface{}{"cert_path": ""},
+	}
+	r := runRC(t, c, discover.HostFacts{})
+	if r.Status != checks.StatusSkip {
+		t.Fatalf("x509 with empty cert_path should SKIP, got %s/%s", r.Status, r.Reason)
+	}
+}
+
 // TestFileModeMaxExposesPermissive proves the mode_max gate flags an
 // over-permissive file. 0o666 is more permissive than 0o644 → fail.
 // Conversely, a file at 0o600 must PASS the same gate.

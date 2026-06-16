@@ -22,10 +22,20 @@ func init() {
 // runX509 validates a PEM cert: optional chain verification against the system
 // trust store, optional hostname match, optional expiration cushion, and
 // optional cert↔key pairing via modulus comparison (no openssl shell-out).
+//
+// If `cert_path` is unset the check is UNKNOWN (a YAML authoring bug); if it
+// expands to an empty string the check SKIPs (the SE declined the cert prompt,
+// so the input the path templates against was never supplied).
 func runX509(rc checks.RunCtx) checks.Result {
-	certPath, ok := getString(rc.Check.With, "cert_path")
-	if !ok || certPath == "" {
+	certPath, present := getString(rc.Check.With, "cert_path")
+	if !present {
 		return unknownf(rc.Check, "missing required `cert_path`")
+	}
+	if certPath == "" {
+		return checks.Result{
+			ID: rc.Check.ID, Title: rc.Check.Title,
+			Status: checks.StatusSkip, Reason: "cert_path input is empty (no value supplied)",
+		}
 	}
 
 	r := checks.Result{
