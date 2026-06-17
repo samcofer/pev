@@ -28,7 +28,7 @@ jobs:
       # previous cosign release where `--output-signature` produces the
       # same .sig blob the README's verify instructions reference. Bump
       # deliberately along with .goreleaser.yaml when refreshing.
-      - uses: sigstore/cosign-installer@v3.10.1
+      - uses: sigstore/cosign-installer@v4.1.2
       - uses: anchore/sbom-action/download-syft@v0
       - uses: goreleaser/goreleaser-action@v7
         with:
