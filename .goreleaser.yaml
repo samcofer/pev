@@ -33,25 +33,28 @@ sboms:
   - artifacts: archive
 
 # Cosign keyless signing of the checksums file (the binaries are verified
-# transitively via the signed checksum file). We emit BOTH the .sig and
-# the .pem certificate alongside the artifact — `cosign verify-blob`
-# needs the cert to validate the chain when the signature was generated
-# with keyless OIDC, and the README's verification steps reference both.
+# transitively via the signed checksum file). cosign 3.x (shipped by
+# cosign-installer v4.x) defaults `--new-bundle-format` on, which folds the
+# signature AND the signing certificate into a single Sigstore bundle. We
+# emit that one `.bundle` artifact instead of the legacy `.sig` + `.pem`
+# pair; `cosign verify-blob --bundle` reads both the signature and the cert
+# chain from it.
 #
-# `certificate:` MUST be set explicitly: without it goreleaser doesn't
-# track the .pem produced by --output-certificate, so the file lands in
-# dist/ but is never uploaded as a release asset. The release.yml
-# self-verify step caught this regression on v0.0.4.
+# `signature:` MUST point at the .bundle so goreleaser tracks and uploads
+# the file --bundle produces; otherwise it lands in dist/ but is never
+# attached as a release asset. The release.yml self-verify step is the
+# backstop that catches that class of regression (it caught the dropped
+# .pem on v0.0.4). Bump cosign-installer deliberately alongside this block.
 signs:
   - cmd: cosign
     artifacts: checksum
-    certificate: "${artifact}.pem"
+    signature: "${artifact}.bundle"
     output: true
     args:
       - sign-blob
       - "--yes"
-      - "--output-signature=${signature}"
-      - "--output-certificate=${certificate}"
+      - "--new-bundle-format=true"
+      - "--bundle=${signature}"
       - "${artifact}"
 
 release:

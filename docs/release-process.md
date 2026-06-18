@@ -27,7 +27,7 @@ Releases are tagged `vX.Y.Z` on `main` and published as signed GitHub Releases v
    - Builds linux/amd64 and linux/arm64 static binaries.
    - Generates an SBOM (Syft).
    - Writes `pev_<VERSION>_checksums.txt`.
-   - Cosign-signs the checksums file via GitHub Actions OIDC.
+   - Cosign-signs the checksums file via GitHub Actions OIDC, emitting a single Sigstore `.bundle` (signature + cert chain) alongside it.
    - Publishes a draft GitHub Release.
 4. Smoke-test the draft release on a real RHEL 9 / RHEL 10 VM (CI uses Alma; this catches anything Alma's rebuild misses — `subscription-manager`, FIPS-mode kernels, license-manager binary differences).
 5. Promote the draft to published.

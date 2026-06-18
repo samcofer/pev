@@ -49,14 +49,16 @@ Releases are signed with [cosign](https://github.com/sigstore/cosign) keyless OI
 
 ```bash
 VERSION=v0.0.2  # or whichever release you want
-curl -fsSL https://github.com/samcofer/pev/releases/download/${VERSION}/pev_linux_amd64                       -o pev
-curl -fsSL https://github.com/samcofer/pev/releases/download/${VERSION}/pev_${VERSION#v}_checksums.txt        -o checksums.txt
-curl -fsSL https://github.com/samcofer/pev/releases/download/${VERSION}/pev_${VERSION#v}_checksums.txt.sig    -o checksums.txt.sig
+curl -fsSL https://github.com/samcofer/pev/releases/download/${VERSION}/pev_linux_amd64                          -o pev
+curl -fsSL https://github.com/samcofer/pev/releases/download/${VERSION}/pev_${VERSION#v}_checksums.txt           -o checksums.txt
+curl -fsSL https://github.com/samcofer/pev/releases/download/${VERSION}/pev_${VERSION#v}_checksums.txt.bundle    -o checksums.txt.bundle
 
 cosign verify-blob \
+  --bundle checksums.txt.bundle \
+  --new-bundle-format \
   --certificate-identity-regexp 'github.com/samcofer/pev' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --signature checksums.txt.sig checksums.txt
+  checksums.txt
 
 sha256sum --check --ignore-missing checksums.txt
 chmod +x pev && ./pev version
