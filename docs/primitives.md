@@ -112,6 +112,14 @@ with:
 
 EC private keys are not supported in v1 — file an issue if you need one.
 
+Outcomes: an empty `cert_path` SKIPs (the SE declined the cert prompt). A real
+chain/hostname/expiry/pairing failure is a FAIL. But when `key_path` or
+`match_hostname` is present in the `with:` payload yet expands to an empty
+string — the cert was supplied but its partner key or hostname was not — that
+verification cannot run, so the result is an advisory **WARN** naming what
+could not be confirmed rather than a misleading PASS. Omitting the key entirely
+(the property was never requested) still PASSes on the cert alone.
+
 ## `pkg`
 
 Distro package presence via `dpkg-query` (Ubuntu) or `rpm` (RHEL family).

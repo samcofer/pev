@@ -1,4 +1,4 @@
-schema_version: 2
+schema_version: 3
 # Egress checks. Every host is verified with a real HTTP GET/HEAD that must
 # return 200, against a path that serves real Posit-controlled (or upstream)
 # content. A bare TCP dial would pass through a transparent proxy that

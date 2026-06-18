@@ -1,4 +1,4 @@
-schema_version: 2
+schema_version: 3
 # POSIX (NFSv3-style) and NFSv4 ACL support per mount.
 #
 # Workbench's project sharing feature uses Access Control Lists to grant

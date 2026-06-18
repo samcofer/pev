@@ -38,7 +38,7 @@ main.go ──► cmd/* (cobra)
    - Dispatch to the registered primitive
    - Record a `Result`
 8. Sort `Results` by ID; render Markdown + JSON; write the report files.
-9. Exit 1 iff `Summary.Fail > 0` — every FAIL is worth investigating; pev does not classify checks into severity tiers.
+9. Exit 1 iff `Summary.Fail > 0` — every FAIL is worth investigating. pev has no graduated severity tiers; the only advisory rung is WARN (visible, counted separately, **not** exit-fatal). See `docs/check-authoring.md` for FAIL vs WARN.
 
 ## Why the splits look the way they do
 

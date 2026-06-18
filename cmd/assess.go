@@ -49,6 +49,25 @@ func newAssessCmd() *cobra.Command {
 		Use:   "assess",
 		Short: "Run the readiness checks and write Markdown + JSON reports",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Validate the enumerated flags up front so a typo or an
+			// unsupported value fails fast with a clear message instead of
+			// silently degrading to a green-but-empty report. Normalizing
+			// here (ppm -> packagemanager, case-folding) also means the rest
+			// of RunE sees canonical catalog tokens.
+			normProducts, err := normalizeProducts(products)
+			if err != nil {
+				return err
+			}
+			products = normProducts
+			normIdP, err := normalizeIdP(idp)
+			if err != nil {
+				return err
+			}
+			idp = normIdP
+			if err := validateOutputs(outputs); err != nil {
+				return err
+			}
+
 			outDir, _ := cmd.Flags().GetString("out-dir")
 			if outDir == "" {
 				outDir = "."
@@ -98,10 +117,7 @@ func newAssessCmd() *cobra.Command {
 			// The multi-select itself runs every time (interactively, an SE
 			// confirms or amends the pre-selection; --yes / --non-interactive
 			// accept the defaults verbatim per surveyDriver.MultiSelect).
-			preselect := discover.SelectedFromFlag(products, facts.Products)
-			if len(preselect) == 0 && profile != "" {
-				preselect = profileToProducts(profile)
-			}
+			preselect := computePreselect(products, profile, facts.Products)
 			const noneOption = "system configuration checks - product independent"
 			defaults := preselect
 			if len(defaults) == 0 {
@@ -212,13 +228,10 @@ func newAssessCmd() *cobra.Command {
 				report.RenderSkipped(os.Stdout, rep, isTerminal(os.Stdout))
 			}
 
-			if rep.Summary.Fail > 0 {
-				return fmt.Errorf("%d failure(s) — see report", rep.Summary.Fail)
-			}
-			return nil
+			return assessExitError(rep.Summary)
 		},
 	}
-	c.Flags().StringSliceVar(&products, "products", nil, "products to assess (workbench,connect,packagemanager); auto-detected if empty")
+	c.Flags().StringSliceVar(&products, "products", nil, "products to assess (workbench,connect,packagemanager; alias ppm); auto-detected if empty")
 	c.Flags().StringVar(&profile, "profile", "", "convenience preset: single-server | workbench | connect | ppm")
 	c.Flags().StringArrayVar(&extraFiles, "checks-file", nil, "extra YAML check pack (repeatable)")
 	c.Flags().BoolVar(&includeUser, "include-user-checks", true, "load packs from ~/.config/pev/checks.d/*.yaml")
@@ -233,6 +246,20 @@ func newAssessCmd() *cobra.Command {
 	c.Flags().StringSliceVar(&skipChecks, "skip-checks", nil, "skip checks by ID")
 	c.Flags().BoolVar(&reviewSkipped, "review-skipped", false, "after the summary, list skipped checks with their skip reason")
 	return c
+}
+
+// assessExitError decides the process exit of `pev assess`. The contract
+// (plan §4.3) is deliberately narrow: ONLY a non-zero Fail count is
+// exit-fatal. WARN is advisory and must never trip a non-zero exit — a
+// WARN-only run still exits 0 — and UNKNOWN is historically non-fatal too
+// (it renders as a failure on screen but does not gate the exit). Keep this
+// keyed solely on Summary.Fail; changing it is a deliberate decision, not a
+// drive-by.
+func assessExitError(s checks.Summary) error {
+	if s.Fail > 0 {
+		return fmt.Errorf("%d failure(s) — see report", s.Fail)
+	}
+	return nil
 }
 
 func mustGetString(cmd *cobra.Command, name string) string {
@@ -250,6 +277,83 @@ func profileToProducts(profile string) []string {
 		return []string{"connect"}
 	case "ppm":
 		return []string{"packagemanager"}
+	}
+	return nil
+}
+
+// computePreselect resolves the multi-select pre-selection per the documented
+// precedence chain: explicit --products flag first, then the --profile preset,
+// then binary auto-detection. The flag and profile are authoritative when set
+// precisely because the SE asked for them — auto-detection is the fallback for
+// when neither was given, NOT an override of an explicit request. (A bare
+// SelectedFromFlag would consult detection before profile, contradicting the
+// doc; this keeps flag > profile > detect.)
+func computePreselect(products []string, profile string, detected discover.Products) []string {
+	if len(products) > 0 {
+		return products
+	}
+	if profile != "" {
+		return profileToProducts(profile)
+	}
+	return discover.SelectedFromFlag(nil, detected)
+}
+
+// canonicalProducts are the catalog's product tokens; --products values
+// normalize onto these (or are rejected).
+var canonicalProducts = map[string]bool{
+	"workbench":      true,
+	"connect":        true,
+	"packagemanager": true,
+}
+
+// normalizeProducts canonicalizes each --products value (case-folded, with the
+// ubiquitous `ppm` alias mapped to the catalog's `packagemanager`) and rejects
+// any value outside the supported set. Without this, a typo or the documented-
+// elsewhere `ppm` alias silently produces a common-only run whose report still
+// claims the bogus product was "Selected". Empty/whitespace tokens are dropped
+// (cobra emits them for `--products=`), which folds to auto-detect downstream.
+func normalizeProducts(in []string) ([]string, error) {
+	out := make([]string, 0, len(in))
+	for _, raw := range in {
+		v := strings.ToLower(strings.TrimSpace(raw))
+		switch {
+		case v == "":
+			continue
+		case v == "ppm":
+			out = append(out, "packagemanager")
+		case canonicalProducts[v]:
+			out = append(out, v)
+		default:
+			return nil, fmt.Errorf("unknown product %q; valid: workbench, connect, packagemanager (alias: ppm)", raw)
+		}
+	}
+	return out, nil
+}
+
+// normalizeIdP canonicalizes --idp and rejects unsupported values. The empty
+// string (flag unset) is preserved so the interactive opt-in prompt still runs;
+// an explicit value must be one of the supported identity-provider kinds.
+func normalizeIdP(idp string) (string, error) {
+	v := strings.ToLower(strings.TrimSpace(idp))
+	switch v {
+	case "", "ldap", "saml", "oidc", "none":
+		return v, nil
+	default:
+		return "", fmt.Errorf("unknown idp %q; valid: ldap, saml, oidc, none", idp)
+	}
+}
+
+// validateOutputs rejects an --output token that names no real format, so a
+// typo like `jsn` fails fast instead of silently writing zero report files on
+// an exit-0 run. Empty tokens are ignored (cobra emits them for `--output=`,
+// which correctly defaults to both formats via wantOutputs).
+func validateOutputs(out []string) error {
+	for _, raw := range out {
+		switch strings.TrimSpace(raw) {
+		case "", "md", "markdown", "json":
+		default:
+			return fmt.Errorf("unknown output %q; valid: md, json", raw)
+		}
 	}
 	return nil
 }

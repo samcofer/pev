@@ -23,6 +23,17 @@ var canonicalCategoryOrder = []string{
 	checks.CategoryOther,
 }
 
+// categoryOf returns the bucket a result belongs to, folding an empty
+// Category onto CategoryOther. Both renderers route through this so the
+// terminal summary and the on-disk Markdown bucket a check identically —
+// an empty Category must never produce a blank-named section header.
+func categoryOf(r checks.Result) string {
+	if r.Category == "" {
+		return checks.CategoryOther
+	}
+	return r.Category
+}
+
 // categoryOrder returns the keys of byCat in display order: known
 // categories first (per canonicalCategoryOrder), unknown categories
 // appended in alphabetical order.

@@ -83,6 +83,27 @@ func TestEngineExpandsTemplate(t *testing.T) {
 	}
 }
 
+// TestEngineRoundTripsWarn proves the engine passes a primitive's StatusWarn
+// through unchanged — the WARN tier is a first-class status, not silently
+// coerced to PASS or FAIL on the way out of runOne.
+func TestEngineRoundTripsWarn(t *testing.T) {
+	e := Engine{Facts: discover.HostFacts{}}
+	c := Check{
+		ID: "x", Title: "x", Why: "x", Primitive: "test-fake",
+		Remediation: "advisory fix",
+		With:        map[string]interface{}{"expect": "warn"},
+	}
+	r := e.runOne(context.Background(), c)
+	if r.Status != StatusWarn {
+		t.Fatalf("want warn, got %s", r.Status)
+	}
+	// Remediation is copied onto FAIL/UNKNOWN only — a WARN carries no fix
+	// banner today (the report renders WARN advisories, not remediations).
+	if r.Remediation != "" {
+		t.Fatalf("WARN should not carry remediation, got %q", r.Remediation)
+	}
+}
+
 func TestEngineSkipsOnMissingInput(t *testing.T) {
 	e := Engine{Facts: discover.HostFacts{}}
 	c := Check{

@@ -1,4 +1,4 @@
-schema_version: 2
+schema_version: 3
 # Runtime kernel/userspace settings that don't fit into mount, package, or
 # security baselines. Each item here is sourced from a recurring
 # Posit-support ticket pattern:

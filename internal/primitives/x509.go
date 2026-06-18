@@ -26,6 +26,13 @@ func init() {
 // If `cert_path` is unset the check is UNKNOWN (a YAML authoring bug); if it
 // expands to an empty string the check SKIPs (the SE declined the cert prompt,
 // so the input the path templates against was never supplied).
+//
+// `match_hostname` and `key_path` are each optional at the schema level (a YAML
+// may omit the key entirely). But when the key IS present and only its value is
+// empty — the cert was supplied yet its partner hostname/key was not — the
+// requested verification cannot run. Rather than report a misleading PASS on a
+// check titled as pairing/hostname verification, the result is an advisory WARN
+// naming what could not be confirmed. A real mismatch is still a FAIL.
 func runX509(rc checks.RunCtx) checks.Result {
 	certPath, present := getString(rc.Check.With, "cert_path")
 	if !present {
@@ -63,8 +70,19 @@ func runX509(rc checks.RunCtx) checks.Result {
 		}
 	}
 
-	if hn, ok := getString(rc.Check.With, "match_hostname"); ok && hn != "" {
-		if err := leaf.VerifyHostname(hn); err != nil {
+	// A verification that the YAML asked for (the key is present) but whose
+	// templated input expanded empty cannot be performed. The cert may still
+	// pass its chain/expiry checks, but a check titled "cert and key are
+	// paired" (or "cert covers the hostname") that never compared a key or a
+	// hostname must NOT report a clean PASS. Collect these gaps and surface
+	// them as an advisory WARN — pev could not confirm the property, so the
+	// SE should supply the missing input rather than trust a green result.
+	var unverified []string
+
+	if hn, ok := getString(rc.Check.With, "match_hostname"); ok {
+		if hn == "" {
+			unverified = append(unverified, "hostname coverage (no hostname supplied)")
+		} else if err := leaf.VerifyHostname(hn); err != nil {
 			r.Status = checks.StatusFail
 			r.Reason = "hostname mismatch: " + err.Error()
 			return r
@@ -80,12 +98,21 @@ func runX509(rc checks.RunCtx) checks.Result {
 		}
 	}
 
-	if keyPath, ok := getString(rc.Check.With, "key_path"); ok && keyPath != "" {
-		if err := matchCertKey(leaf, keyPath); err != nil {
+	if keyPath, ok := getString(rc.Check.With, "key_path"); ok {
+		if keyPath == "" {
+			unverified = append(unverified, "cert/key pairing (no key supplied)")
+		} else if err := matchCertKey(leaf, keyPath); err != nil {
 			r.Status = checks.StatusFail
 			r.Reason = "cert/key mismatch: " + err.Error()
 			return r
 		}
+	}
+
+	if len(unverified) > 0 {
+		r.Status = checks.StatusWarn
+		r.Reason = "cert validated, but could not verify " + strings.Join(unverified, " and ") +
+			"; supply the missing input to complete the check"
+		return r
 	}
 
 	r.Status = checks.StatusPass

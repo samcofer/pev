@@ -4,8 +4,9 @@ Each row in the standard customer onboarding runbook ("Prerequisites" tab) maps 
 
 This file is the contract — when a runbook prereq lands here, the corresponding YAML check exists in the catalog and is exercised by CI.
 
-Every FAIL is treated as worth investigating; pev does not classify checks
-into severity tiers. The catalog is common-only — language and identity
+Every FAIL is treated as worth investigating; pev has no graduated severity
+tiers beyond a single advisory rung (WARN — visible but not blocking; see
+`docs/check-authoring.md`). The catalog is common-only — language and identity
 checks apply to any host running Workbench, Connect, or Package Manager.
 
 ## Shared infrastructure (all products)

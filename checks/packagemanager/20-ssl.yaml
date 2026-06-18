@@ -1,4 +1,4 @@
-schema_version: 2
+schema_version: 3
 checks:
   - id: ppm.ssl.cert-key-match
     title: Package Manager SSL certificate and key are paired

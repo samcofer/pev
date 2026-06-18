@@ -46,13 +46,18 @@ func renderHeader(b *strings.Builder, rep checks.Report) {
 
 func renderSummary(b *strings.Builder, rep checks.Report) {
 	b.WriteString("## Summary\n\n")
-	fmt.Fprintf(b, "| Pass | Fail | Skip | Unknown |\n")
-	fmt.Fprintf(b, "|---:|---:|---:|---:|\n")
-	fmt.Fprintf(b, "| %d | %d | %d | %d |\n\n",
-		rep.Summary.Pass, rep.Summary.Fail, rep.Summary.Skip, rep.Summary.Unknown)
-	if rep.Summary.Fail > 0 {
+	fmt.Fprintf(b, "| Pass | Warn | Fail | Skip | Unknown |\n")
+	fmt.Fprintf(b, "|---:|---:|---:|---:|---:|\n")
+	fmt.Fprintf(b, "| %d | %d | %d | %d | %d |\n\n",
+		rep.Summary.Pass, rep.Summary.Warn, rep.Summary.Fail, rep.Summary.Skip, rep.Summary.Unknown)
+	switch {
+	case rep.Summary.Fail > 0:
 		fmt.Fprintf(b, "**%d failure(s)** — investigate before proceeding.\n\n", rep.Summary.Fail)
-	} else {
+	case rep.Summary.Warn > 0:
+		// Advisory only: a WARN-clean run is still installable. Make the
+		// distinction explicit so a reader doesn't conflate it with FAIL.
+		fmt.Fprintf(b, "**%d warning(s)** — review, not blocking.\n\n", rep.Summary.Warn)
+	default:
 		b.WriteString("All checks passed.\n\n")
 	}
 }
@@ -133,11 +138,7 @@ func renderResult(b *strings.Builder, r checks.Result) {
 func groupByCategory(in []checks.Result) map[string][]checks.Result {
 	out := map[string][]checks.Result{}
 	for _, r := range in {
-		cat := r.Category
-		if cat == "" {
-			cat = checks.CategoryOther
-		}
-		out[cat] = append(out[cat], r)
+		out[categoryOf(r)] = append(out[categoryOf(r)], r)
 	}
 	for k := range out {
 		sort.Slice(out[k], func(i, j int) bool { return out[k][i].ID < out[k][j].ID })
@@ -149,6 +150,8 @@ func iconFor(s checks.Status) string {
 	switch s {
 	case checks.StatusPass:
 		return "[PASS]"
+	case checks.StatusWarn:
+		return "[WARN]"
 	case checks.StatusFail:
 		return "[FAIL]"
 	case checks.StatusSkip:

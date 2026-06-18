@@ -1,4 +1,4 @@
-schema_version: 2
+schema_version: 3
 # Filesystem mount-option and ownership checks. /tmp and /home semantics
 # trip up Posit installs in two specific ways:
 #   1. `noexec` mounts break R package compilation, pip/uv venv shims, and

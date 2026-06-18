@@ -1,4 +1,4 @@
-schema_version: 2
+schema_version: 3
 # Database prereqs. Currently PostgreSQL only; Connect and Package
 # Manager use Postgres as their external DB in HA configurations. Both
 # checks fire only when the SE confirmed Postgres usage during the

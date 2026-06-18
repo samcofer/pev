@@ -25,7 +25,7 @@ func TestLoadRejectsBadSchema(t *testing.T) {
 
 func TestLoadRejectsDuplicateID(t *testing.T) {
 	dir := t.TempDir()
-	body := `schema_version: 2
+	body := `schema_version: 3
 checks:
 - id: dupe
   title: a
@@ -47,7 +47,7 @@ checks:
 
 func TestLoadOK(t *testing.T) {
 	dir := t.TempDir()
-	body := `schema_version: 2
+	body := `schema_version: 3
 checks:
 - id: ok.one
   title: one

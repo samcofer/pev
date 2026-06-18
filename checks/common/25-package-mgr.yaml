@@ -1,4 +1,4 @@
-schema_version: 2
+schema_version: 3
 # Distro package-manager health. Posit installers shell out to apt/dnf to
 # pull system dependencies; if the manager itself is broken (stale apt
 # index, dnf metadata cache poisoned, repo URL behind a proxy not in env)

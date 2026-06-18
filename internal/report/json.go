@@ -52,6 +52,8 @@ func Summarize(results []checks.Result) checks.Summary {
 		switch r.Status {
 		case checks.StatusPass:
 			s.Pass++
+		case checks.StatusWarn:
+			s.Warn++
 		case checks.StatusFail:
 			s.Fail++
 		case checks.StatusSkip:

@@ -1,4 +1,4 @@
-schema_version: 2
+schema_version: 3
 # Host security posture. SELinux Enforcing and AppArmor Enabled are the two
 # top causes of "process started but cannot bind/write/exec" tickets, so
 # both are gated as failures rather than informational. Firewall daemons get

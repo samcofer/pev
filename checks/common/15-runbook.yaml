@@ -1,4 +1,4 @@
-schema_version: 2
+schema_version: 3
 # Runbook prereqs sourced from the Posit Team install guide:
 #   https://gist.github.com/leesahanders/12a44e570e16747a7e4a95c4c6cbf81b
 # These cover umask hardening, RHEL subscription, NFS dependencies, DNS

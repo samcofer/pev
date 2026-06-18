@@ -1,4 +1,4 @@
-schema_version: 2
+schema_version: 3
 checks:
   - id: connect.ssl.cert-key-match
     title: Connect SSL certificate and key are paired

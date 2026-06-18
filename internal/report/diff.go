@@ -10,8 +10,10 @@ import (
 )
 
 // Diff compares two reports and classifies every check ID into one of:
-// regression (PASS->FAIL/UNKNOWN), improvement (FAIL/UNKNOWN->PASS),
-// added, removed, or unchanged-evidence-changed.
+// regression (a move up the severity ladder PASS < WARN < FAIL/UNKNOWN),
+// improvement (a move down it), other status change (any transition that
+// touches an off-ladder status like SKIP, or swaps between equal-rank
+// FAIL/UNKNOWN), added, removed, or unchanged-evidence-changed.
 type Diff struct {
 	Baseline      Header      `json:"baseline"`
 	Current       Header      `json:"current"`
@@ -60,10 +62,17 @@ func Compute(a, b checks.Report) (Diff, error) {
 			d.Added = append(d.Added, entryNow(br))
 			continue
 		}
+		// Classify on the severity ladder PASS < WARN < FAIL/UNKNOWN. A
+		// move up is a regression, a move down an improvement. Transitions
+		// touching an off-ladder status (SKIP, or any equal-rank FAIL<->UNKNOWN
+		// swap) are neither and fall through to "other status change". This
+		// reproduces the pre-WARN behavior exactly for the four old statuses
+		// and slots WARN in as the middle rung per the plan's §5 table.
+		ra, rb := severityRank(ar.Status), severityRank(br.Status)
 		switch {
-		case ar.Status == checks.StatusPass && (br.Status == checks.StatusFail || br.Status == checks.StatusUnknown):
+		case ra >= 0 && rb >= 0 && ra < rb:
 			d.Regressions = append(d.Regressions, entryDelta(ar, br))
-		case (ar.Status == checks.StatusFail || ar.Status == checks.StatusUnknown) && br.Status == checks.StatusPass:
+		case ra >= 0 && rb >= 0 && ra > rb:
 			d.Improvements = append(d.Improvements, entryDelta(ar, br))
 		case ar.Status != br.Status:
 			d.StatusChanged = append(d.StatusChanged, entryDelta(ar, br))
@@ -83,6 +92,27 @@ func Compute(a, b checks.Report) (Diff, error) {
 		sort.Slice(slice, func(i, j int) bool { return slice[i].ID < slice[j].ID })
 	}
 	return d, nil
+}
+
+// severityRank places a status on the diff severity ladder so that a higher
+// rank is unambiguously "worse". PASS(0) < WARN(1) < FAIL/UNKNOWN(2). FAIL
+// and UNKNOWN share rank 2: a swap between them is neither better nor worse,
+// so it falls through to "other status change" exactly as it did before WARN
+// existed. SKIP — and any status not on the ladder — returns -1, which the
+// caller treats as off-ladder (never an improvement or regression). Keeping
+// this as a pure ranking function means the §5 transition table is enforced
+// by ordering alone, not by enumerating every pair.
+func severityRank(s checks.Status) int {
+	switch s {
+	case checks.StatusPass:
+		return 0
+	case checks.StatusWarn:
+		return 1
+	case checks.StatusFail, checks.StatusUnknown:
+		return 2
+	default:
+		return -1
+	}
 }
 
 func indexBy(rs []checks.Result) map[string]checks.Result {
@@ -123,7 +153,9 @@ func evidenceSummary(r checks.Result) string {
 	return strings.Join(parts, " | ")
 }
 
-// HasRegressions returns true if there are PASS->FAIL/UNKNOWN transitions.
+// HasRegressions returns true if any check moved up the severity ladder
+// (PASS < WARN < FAIL/UNKNOWN) — e.g. PASS->WARN, PASS->FAIL, WARN->FAIL,
+// WARN->UNKNOWN. Any such move flips the flag so `pev diff` can gate CI on it.
 func (d Diff) HasRegressions() bool { return len(d.Regressions) > 0 }
 
 // RenderDiffMarkdown formats a Diff for human consumption.

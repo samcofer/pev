@@ -5,7 +5,7 @@
 ## Minimum viable pack
 
 ```yaml
-schema_version: 2
+schema_version: 3
 checks:
   - id: mycorp.example.binary
     title: My corp's wrapper binary is installed
@@ -43,6 +43,38 @@ pev lint-checks ./mycorp-pack.yaml
 | `references` | no | List of authoritative doc URLs. |
 | `primitive` | yes | One of the registered primitive names — see `docs/primitives.md`. |
 | `with` | yes | Primitive-specific payload. |
+
+## Choosing an outcome: FAIL vs WARN vs UNKNOWN vs SKIP
+
+A check resolves to one of five statuses. Picking the right one is the single
+most important authoring decision — it is what an SE acts on. The catalog does
+**not** have graduated severity tiers; the choice is deliberately coarse.
+
+- **FAIL** — the install will likely fail, break, or be unsupported if this is
+  not fixed. This is the default for any prerequisite. A FAIL trips a non-zero
+  exit from `pev assess` and is rendered red. When in doubt, use FAIL.
+- **WARN** — the host can be installed on as-is, but the SE should note this:
+  a non-standard-but-valid layout, a soft recommendation not met, or a
+  condition that matters only for some deployment shapes. A WARN is rendered
+  yellow, counted separately in the summary, and is **not** exit-fatal — the
+  run still exits 0. WARN is *not* "FAIL but I'm not confident": if a check
+  cannot decide, that is UNKNOWN; if it does not apply, that is SKIP. Treating
+  WARN as a hedge erodes it into noise and defeats the point of the tier.
+- **UNKNOWN** — the check could not reach a verdict (a primitive errored, a
+  tool was missing mid-run, output was unparseable). The engine assigns this;
+  authors rarely return it deliberately. It renders as a failure on screen but
+  does not trip the exit code today.
+- **SKIP** — the check does not apply to this host/product/arch selection, a
+  required input was not supplied, or `requires_root` was set and pev is
+  non-root. The engine assigns SKIP automatically from `applies_to`,
+  `requires`, `requires_root`, and missing-input template failures; authors
+  gate rather than emit it.
+
+> Note: as of `schema_version: 3` the model is PASS / WARN / FAIL / SKIP /
+> UNKNOWN. Most built-in primitives (`cmd`, `sizing`, …) still only return
+> PASS or FAIL; a YAML author cannot yet *request* WARN from them. The tier
+> exists in the model and report; the mechanism for a check to emit it is a
+> separate, later piece of work.
 
 ## Templating
 

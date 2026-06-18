@@ -16,13 +16,32 @@ import (
 // v2 (2026-06): dropped Severity. Every FAIL is treated as worth
 // investigating; the catalog no longer tries to predict which failures
 // will block an install.
-const SchemaVersion = 2
+//
+// v3 (2026-06): added the WARN tier (StatusWarn / Summary.Warn). This is a
+// deliberate, narrow partial reversal of v2's "no severity tiers" stance —
+// not a return to graduated severities. The model is now binary plus one
+// advisory rung:
+//
+//   - FAIL — the install will likely fail, break, or be unsupported if this
+//     is not fixed. The default for any prerequisite. Trips a non-zero exit.
+//   - WARN — the host can be installed on as-is, but the SE should note this:
+//     a non-standard-but-valid layout, a soft recommendation not met, a
+//     condition that matters only for some deployment shapes. Visible on
+//     screen (yellow), but NOT counted against the run and NOT exit-fatal.
+//
+// WARN is not "FAIL but I'm not sure" — an undecidable check is UNKNOWN, and
+// an inapplicable one is SKIP. Authors: when in doubt, use FAIL. See
+// docs/check-authoring.md for the full guidance. The key set changed
+// (summary.warn is new), so a v3 binary cannot diff against a v2 report.
+const SchemaVersion = 3
 
-// Status is the outcome of running a check.
+// Status is the outcome of running a check. On a severity ladder, WARN sits
+// strictly between PASS and FAIL: worth surfacing, not disqualifying.
 type Status string
 
 const (
 	StatusPass    Status = "pass"
+	StatusWarn    Status = "warn"
 	StatusFail    Status = "fail"
 	StatusSkip    Status = "skip"
 	StatusUnknown Status = "unknown"
@@ -164,6 +183,7 @@ type Result struct {
 type Summary struct {
 	Total   int `json:"total"`
 	Pass    int `json:"pass"`
+	Warn    int `json:"warn"`
 	Fail    int `json:"fail"`
 	Skip    int `json:"skip"`
 	Unknown int `json:"unknown"`

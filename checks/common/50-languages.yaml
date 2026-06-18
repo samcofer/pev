@@ -1,4 +1,4 @@
-schema_version: 2
+schema_version: 3
 # Language toolchain prereqs that apply to every Posit product. Posit's
 # reproducibility model expects R/Python at /opt/<lang>/<version>/bin/<bin>
 # regardless of which product runs on the host (Workbench needs R for IDE

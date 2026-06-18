@@ -1,4 +1,4 @@
-schema_version: 2
+schema_version: 3
 # Sizing minimums match the "Minimum" tier in Posit's official sizing
 # recommendations. Anything below these values is testing/sandbox territory
 # only — production deployments should follow the "Recommended" tier in the

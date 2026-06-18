@@ -1,4 +1,4 @@
-schema_version: 2
+schema_version: 3
 # Default Posit product ports must be bindable on this host. We open a
 # transient TCP listener and immediately close it. Failure modes the
 # check catches:

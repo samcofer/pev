@@ -97,3 +97,76 @@ func TestX509ExpirationCushion(t *testing.T) {
 		t.Fatalf("expected expiration failure, got %s/%s", r.Status, r.Reason)
 	}
 }
+
+// TestX509EmptyKeyPathWarns is the half-pair backstop: a cert was supplied
+// (and validates) but the key_path key is present-but-empty — the SE skipped
+// the "required" key prompt. The pairing was never verified, so the check
+// titled "...certificate and key are paired" must WARN, not PASS. This is the
+// authoritative guard regardless of how the empty input arrived (skip magic
+// word, blanked default, or a host with no discovered key).
+func TestX509EmptyKeyPathWarns(t *testing.T) {
+	cert, _ := makeCertKey(t, "host.example.com", time.Now().Add(365*24*time.Hour))
+	c := checks.Check{
+		ID: "workbench.ssl.cert-key-match", Title: "Workbench SSL certificate and key are paired",
+		Primitive: "x509",
+		With:      map[string]interface{}{"cert_path": cert, "key_path": "", "match_hostname": "host.example.com", "not_after_min_days": 30},
+	}
+	r := runRC(t, c, discover.HostFacts{})
+	if r.Status != checks.StatusWarn {
+		t.Fatalf("empty key_path must WARN (pairing unverified), got %s/%s", r.Status, r.Reason)
+	}
+	if !strings.Contains(r.Reason, "pairing") {
+		t.Fatalf("WARN reason must name the unverified pairing, got %q", r.Reason)
+	}
+}
+
+// TestX509EmptyHostnameWarns is the companion half-pair guard: a cert was
+// supplied (and its key pairs) but match_hostname is present-but-empty, so the
+// "cert covers the hostname" property was never checked. The result must WARN.
+func TestX509EmptyHostnameWarns(t *testing.T) {
+	cert, key := makeCertKey(t, "host.example.com", time.Now().Add(365*24*time.Hour))
+	c := checks.Check{
+		ID: "x", Title: "x", Primitive: "x509",
+		With: map[string]interface{}{"cert_path": cert, "key_path": key, "match_hostname": "", "not_after_min_days": 30},
+	}
+	r := runRC(t, c, discover.HostFacts{})
+	if r.Status != checks.StatusWarn {
+		t.Fatalf("empty match_hostname must WARN (coverage unverified), got %s/%s", r.Status, r.Reason)
+	}
+	if !strings.Contains(r.Reason, "hostname") {
+		t.Fatalf("WARN reason must name the unverified hostname coverage, got %q", r.Reason)
+	}
+}
+
+// TestX509BothHalvesEmptyWarnsOnce proves the WARN reason aggregates BOTH gaps
+// (hostname + pairing) into one advisory rather than reporting only the first.
+func TestX509BothHalvesEmptyWarnsOnce(t *testing.T) {
+	cert, _ := makeCertKey(t, "host.example.com", time.Now().Add(365*24*time.Hour))
+	c := checks.Check{
+		ID: "x", Title: "x", Primitive: "x509",
+		With: map[string]interface{}{"cert_path": cert, "key_path": "", "match_hostname": ""},
+	}
+	r := runRC(t, c, discover.HostFacts{})
+	if r.Status != checks.StatusWarn {
+		t.Fatalf("both halves empty must WARN, got %s/%s", r.Status, r.Reason)
+	}
+	if !strings.Contains(r.Reason, "hostname") || !strings.Contains(r.Reason, "pairing") {
+		t.Fatalf("WARN reason must name both unverified properties, got %q", r.Reason)
+	}
+}
+
+// TestX509OmittedOptionalKeysStillPass guards the distinction between
+// "key absent from YAML" (the property was never requested → PASS) and
+// "key present-but-empty" (requested but uncheckable → WARN). A cert-only
+// check with neither key_path nor match_hostname keys must still PASS.
+func TestX509OmittedOptionalKeysStillPass(t *testing.T) {
+	cert, _ := makeCertKey(t, "host.example.com", time.Now().Add(365*24*time.Hour))
+	c := checks.Check{
+		ID: "x", Title: "x", Primitive: "x509",
+		With: map[string]interface{}{"cert_path": cert, "not_after_min_days": 30},
+	}
+	r := runRC(t, c, discover.HostFacts{})
+	if r.Status != checks.StatusPass {
+		t.Fatalf("cert-only check (optional keys omitted) must PASS, got %s/%s", r.Status, r.Reason)
+	}
+}

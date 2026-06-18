@@ -37,29 +37,38 @@ func RenderTerminal(w io.Writer, rep checks.Report, color bool) {
 		rep.FinishedAt.Sub(rep.StartedAt).Round(1e9))
 
 	// Totals — one line, pipe-separated, easy to scan and to grep.
-	totals := fmt.Sprintf("Pass %d  |  Fail %d  |  Skip %d  |  Unknown %d",
-		rep.Summary.Pass, rep.Summary.Fail, rep.Summary.Skip, rep.Summary.Unknown)
+	totals := fmt.Sprintf("Pass %d  |  Warn %d  |  Fail %d  |  Skip %d  |  Unknown %d",
+		rep.Summary.Pass, rep.Summary.Warn, rep.Summary.Fail, rep.Summary.Skip, rep.Summary.Unknown)
 	fmt.Fprintln(w, totals)
-	if rep.Summary.Fail > 0 {
+	// Headline keys on Fail first (blocking), then Warn (advisory, not
+	// exit-fatal — see cmd/assess.go). WARN never suppresses or replaces a
+	// FAIL headline; failures always take the floor.
+	switch {
+	case rep.Summary.Fail > 0:
 		fmt.Fprintf(w, "%s investigate before proceeding.\n",
 			red(fmt.Sprintf("%d failure(s) —", rep.Summary.Fail)))
-	} else {
+	case rep.Summary.Warn > 0:
+		fmt.Fprintf(w, "%s\n",
+			yellow(fmt.Sprintf("%d warning(s) — review, not blocking.", rep.Summary.Warn)))
+	default:
 		fmt.Fprintf(w, "%s\n", dim("All checks passed."))
 	}
 	fmt.Fprintln(w)
 
 	renderTerminalEnvironment(w, rep, bold)
 
-	// Group failing/unknown results by category. Pass and Skip stay out
-	// of the terminal — they live in the on-disk Markdown for the full
-	// audit trail. UNKNOWN counts as a failure here because it means a
-	// primitive could not decide.
+	// Group failing/unknown/warning results by category. Pass and Skip
+	// stay out of the terminal — they live in the on-disk Markdown for the
+	// full audit trail. UNKNOWN counts as a failure here because it means a
+	// primitive could not decide. WARN is advisory: it is shown (yellow,
+	// the point of the tier is that the SE sees it) but it is not a
+	// failure, so it never trips the exit code (see cmd/assess.go).
 	byCat := map[string][]checks.Result{}
 	for _, r := range rep.Results {
-		if r.Status != checks.StatusFail && r.Status != checks.StatusUnknown {
+		if r.Status != checks.StatusFail && r.Status != checks.StatusUnknown && r.Status != checks.StatusWarn {
 			continue
 		}
-		byCat[r.Category] = append(byCat[r.Category], r)
+		byCat[categoryOf(r)] = append(byCat[categoryOf(r)], r)
 	}
 	if len(byCat) == 0 {
 		fmt.Fprintln(w, dim("All checks passed (or were skipped)."))
@@ -69,14 +78,17 @@ func RenderTerminal(w io.Writer, rep checks.Report, color bool) {
 	for _, cat := range categoryOrder(byCat) {
 		rs := byCat[cat]
 		sort.Slice(rs, func(i, j int) bool { return rs[i].ID < rs[j].ID })
-		fmt.Fprintf(w, "%s (%d failing)\n", bold(cat), len(rs))
+		fmt.Fprintf(w, "%s (%s)\n", bold(cat), categoryCounts(rs))
 		for _, r := range rs {
-			tag := "[FAIL]"
-			if r.Status == checks.StatusUnknown {
+			tag, colour := "[FAIL]", red
+			switch r.Status {
+			case checks.StatusUnknown:
 				tag = "[UNKN]"
+			case checks.StatusWarn:
+				tag, colour = "[WARN]", yellow
 			}
 			line := fmt.Sprintf("  %s\t%s\t%s", tag, r.ID, r.Title)
-			fmt.Fprintln(w, red(line))
+			fmt.Fprintln(w, colour(line))
 			if r.Reason != "" {
 				fmt.Fprintf(w, "    %s %s\n", yellow("reason:"), r.Reason)
 			}
@@ -116,7 +128,7 @@ func RenderSkipped(w io.Writer, rep checks.Report, color bool) {
 		if r.Status != checks.StatusSkip {
 			continue
 		}
-		byCat[r.Category] = append(byCat[r.Category], r)
+		byCat[categoryOf(r)] = append(byCat[categoryOf(r)], r)
 	}
 	if len(byCat) == 0 {
 		fmt.Fprintln(w, dim("No checks were skipped."))
@@ -176,6 +188,30 @@ func renderTerminalEnvironment(w io.Writer, rep checks.Report, bold func(string)
 		fmt.Fprintf(w, "  Selected:     %s\n", strings.Join(rep.Run.Products, ", "))
 	}
 	fmt.Fprintln(w)
+}
+
+// categoryCounts renders the per-category header tally. WARN must not be
+// folded into "failing" — a category with only advisories reads "1 warning",
+// not "1 failing". FAIL and UNKNOWN are both counted as "failing" (UNKNOWN is
+// treated as a failure for display; see the loop above). Examples:
+// "3 failing", "2 warning(s)", "3 failing, 2 warning(s)".
+func categoryCounts(rs []checks.Result) string {
+	failing, warning := 0, 0
+	for _, r := range rs {
+		if r.Status == checks.StatusWarn {
+			warning++
+		} else {
+			failing++
+		}
+	}
+	switch {
+	case failing > 0 && warning > 0:
+		return fmt.Sprintf("%d failing, %d warning(s)", failing, warning)
+	case warning > 0:
+		return fmt.Sprintf("%d warning(s)", warning)
+	default:
+		return fmt.Sprintf("%d failing", failing)
+	}
 }
 
 func wrap(s, code string, on bool) string {
