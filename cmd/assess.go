@@ -119,10 +119,12 @@ func newAssessCmd() *cobra.Command {
 			// accept the defaults verbatim per surveyDriver.MultiSelect).
 			preselect := computePreselect(products, profile, facts.Products)
 			const noneOption = "system configuration checks - product independent"
-			defaults := preselect
-			if len(defaults) == 0 {
-				defaults = []string{noneOption}
-			}
+			// The product-independent system checks always run, so the
+			// system-checks box is pre-selected in every case. When a product
+			// is detected/requested, BOTH it and the system-checks box start
+			// checked (the SE can deselect either). filterNoneOption strips the
+			// sentinel afterward; common checks run regardless of the toggle.
+			defaults := append([]string{noneOption}, preselect...)
 			picks, _ := driver.MultiSelect(
 				"Which Posit products will run on this host?",
 				[]string{noneOption, "workbench", "connect", "packagemanager"},
@@ -429,7 +431,7 @@ func buildInputs(
 	promptPostgres(d, in)
 	promptPAM(d, in)
 	promptProDrivers(d, in)
-	promptHomeShare(d, in)
+	promptHomeShare(d, in, wanted)
 	return in
 }
 
@@ -530,13 +532,38 @@ func promptProDrivers(d prompt.Driver, in map[string]string) {
 }
 
 // promptHomeShare collects the local mountpoint of a customer NFS-backed
-// home share when one is in use. Default NO.
-func promptHomeShare(d prompt.Driver, in map[string]string) {
-	want, _ := d.Confirm("Will home directory be mounted on an NFS share?", false)
+// share when one is in use. Default NO.
+//
+// The wording adapts to the selected products: Workbench keeps per-user
+// home directories on the share (project files, ~/.config, renv libraries),
+// so the question and default mountpoint are about /home. Connect and
+// Package Manager have no per-user home requirement — what lives on NFS for
+// them is the application's variable-data directory (Connect's
+// /var/lib/rstudio-connect, PPM's /var/lib/rstudio-pm) in an HA setup — so
+// when Workbench is NOT selected we ask about the DataDir instead. The
+// downstream storage.home.* checks are worded generically ("declared home
+// share") and probe whatever mountpoint the SE supplies, so only the prompt
+// text changes.
+func promptHomeShare(d prompt.Driver, in map[string]string, wanted map[string]bool) {
+	question := "Will home directory be mounted on an NFS share?"
+	inputPrompt := "NFS-backed home share mountpoint (the local path, e.g. /home):"
+	defaultPath := "/home"
+	if !wanted["workbench"] {
+		// Connect/PM only — default the example to whichever product's
+		// DataDir applies (Connect wins when both are selected).
+		dataDir := "/var/lib/rstudio-connect"
+		if wanted["ppm"] && !wanted["connect"] {
+			dataDir = "/var/lib/rstudio-pm"
+		}
+		question = "Will the application's data directory (DataDir) be mounted on an NFS share?"
+		inputPrompt = "NFS-backed DataDir mountpoint (the local path, e.g. " + dataDir + "):"
+		defaultPath = dataDir
+	}
+	want, _ := d.Confirm(question, false)
 	if !want {
 		return
 	}
-	got, _ := d.Input("NFS-backed home share mountpoint (the local path, e.g. /home):", "/home")
+	got, _ := d.Input(inputPrompt, defaultPath)
 	if got != "" {
 		in["home_share_path"] = got
 	}

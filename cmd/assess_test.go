@@ -2,11 +2,62 @@ package cmd
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/posit-dev/pev/internal/checks"
 	"github.com/posit-dev/pev/internal/discover"
 )
+
+// recordingDriver is a prompt.Driver test double: it answers No to every
+// Confirm and records the question text so tests can assert the wording a
+// given product selection produces. Input/Select/Password return their
+// default so the driver is usable for any prompt, but the home-share tests
+// only need the Confirm question.
+type recordingDriver struct{ confirms []string }
+
+func (r *recordingDriver) Input(q, def string) (string, error) { return def, nil }
+func (r *recordingDriver) Confirm(q string, def bool) (bool, error) {
+	r.confirms = append(r.confirms, q)
+	return false, nil
+}
+func (r *recordingDriver) Select(q string, opts []string, def string) (string, error) {
+	return def, nil
+}
+func (r *recordingDriver) MultiSelect(q string, opts, def []string) ([]string, error) {
+	return def, nil
+}
+func (r *recordingDriver) Password(q string) (string, error) { return "", nil }
+
+// TestPromptHomeShareWording locks in the NFS prompt's product-aware
+// wording: Workbench keeps per-user home directories on the share, so the
+// question is about the home directory; Connect/PM have no home requirement,
+// so the question is about the application's DataDir instead.
+func TestPromptHomeShareWording(t *testing.T) {
+	cases := []struct {
+		name       string
+		wanted     map[string]bool
+		wantSubstr string
+	}{
+		{"workbench asks about home directory", map[string]bool{"workbench": true}, "home directory"},
+		{"workbench + connect still asks about home directory", map[string]bool{"workbench": true, "connect": true}, "home directory"},
+		{"connect-only asks about DataDir", map[string]bool{"connect": true}, "DataDir"},
+		{"ppm-only asks about DataDir", map[string]bool{"ppm": true}, "DataDir"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			d := &recordingDriver{}
+			in := map[string]string{}
+			promptHomeShare(d, in, tc.wanted)
+			if len(d.confirms) != 1 {
+				t.Fatalf("expected exactly one Confirm, got %d: %v", len(d.confirms), d.confirms)
+			}
+			if !strings.Contains(d.confirms[0], tc.wantSubstr) {
+				t.Fatalf("question %q should mention %q", d.confirms[0], tc.wantSubstr)
+			}
+		})
+	}
+}
 
 // TestAssessExitErrorOnlyFailIsFatal locks in the plan §4.3 exit contract:
 // `pev assess` returns a non-zero (error) exit ONLY when Summary.Fail > 0. A
