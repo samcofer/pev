@@ -22,6 +22,11 @@ func TestNormalize(t *testing.T) {
 		{"alma-9", map[string]string{"ID": "almalinux", "VERSION_ID": "9.4"}, "rhel-9"},
 		{"alma-10", map[string]string{"ID": "almalinux", "VERSION_ID": "10.0"}, "rhel-10"},
 		{"rocky-9", map[string]string{"ID": "rocky", "VERSION_ID": "9.5"}, "rhel-9"},
+		// CentOS normalizes to rhel-<major> here so the RHEL-family catalog
+		// applies. This is intentionally NOT a statement of support: the
+		// os.supported check re-reads the raw ID and rejects CentOS Stream
+		// 9/10 (upstream of RHEL, not a binary-compatible rebuild). The
+		// normalize/support split is by design — see the package doc.
 		{"centos-stream-10", map[string]string{"ID": "centos", "VERSION_ID": "10"}, "rhel-10"},
 		{"oracle-9", map[string]string{"ID": "ol", "VERSION_ID": "9.4"}, "rhel-9"},
 		{"unknown-distro", map[string]string{"ID": "exotic", "VERSION_ID": "1"}, "unknown"},

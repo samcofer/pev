@@ -1,8 +1,15 @@
 // Package operatingsystem detects the running Linux distribution and
 // normalizes it into the canonical IDs used by the check catalog
-// (e.g. ubuntu-22.04, rhel-9). RHEL-family rebuilds (Alma, Rocky, CentOS
-// Stream, Oracle) collapse onto rhel-<major> so a single check catalog
-// covers both real RHEL and its rebuilds without divergence.
+// (e.g. ubuntu-22.04, rhel-9). RHEL-family distros (Alma, Rocky, Oracle,
+// CentOS) collapse onto rhel-<major> so a single check catalog covers real
+// RHEL and its rebuilds with one set of applies_to.os gates.
+//
+// Normalization is deliberately coarse: it answers "which catalog applies",
+// not "is this distro supported". Support is a separate judgement made by the
+// os.supported check (checks/common/00-os.yaml), which re-reads the raw
+// /etc/os-release ID and can be stricter than this mapping — e.g. it rejects
+// CentOS Stream 9/10 (upstream of RHEL, not a binary-compatible rebuild) even
+// though they normalize to rhel-9/rhel-10 here.
 package operatingsystem
 
 import (
