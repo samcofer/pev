@@ -55,7 +55,8 @@ jobs:
             #   sec.apparmor.not-enabled   — runner host has AppArmor enabled; check observes the host kernel
             #   sizing.connect.minimum     — GH runner is below the 100 GB / 4 GB customer minimum
             #   storage.acl.posix.home-and-local — image ships without acl/setfacl
-            #   connect.smtp.reachable     — UNKNOWN: no smtp host supplied
+            # (connect.smtp.reachable now SKIPs when no smtp host is supplied, so it
+            #  no longer appears in the fail/unknown set and needs no allowlist entry.)
             allowed_unexpected: |
               pkg-mgr.apt.repolist-fresh
               pkg.libcurl-dev
@@ -63,7 +64,6 @@ jobs:
               sec.apparmor.not-enabled
               sizing.connect.minimum
               storage.acl.posix.home-and-local
-              connect.smtp.reachable
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6

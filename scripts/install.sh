@@ -4,6 +4,12 @@
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/samcofer/pev/main/scripts/install.sh | sh
 #
+# To install AND assess in one line, join with `&&`, never a pipe:
+#   curl -fsSL .../install.sh | sh && pev assess
+# Do NOT do `... | sh | pev assess`: that hands pev a non-TTY stdin, so it
+# detects no terminal and silently runs in --yes mode (no prompts, all
+# discovered defaults accepted).
+#
 # Environment overrides:
 #   PEV_VERSION     — release tag to pin (default: latest, e.g. v0.0.2)
 #   PEV_INSTALL_DIR — destination directory (default: ~/.local/bin for non-root,

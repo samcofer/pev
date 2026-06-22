@@ -23,10 +23,18 @@ Today, the prereq verification call before a Posit install is a manual checklist
 ### One-line install (recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/samcofer/pev/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/samcofer/pev/main/scripts/install.sh | sh && pev assess
 ```
 
 Detects amd64 / arm64, downloads the latest release, verifies the SHA-256 against the published `pev_<version>_checksums.txt`, and installs to `~/.local/bin/pev` (or `/usr/local/bin/pev` when run as root). Re-running upgrades in place.
+
+> **Do not pipe the installer into `pev`** (`curl ... | sh | pev assess`). That makes `pev`'s stdin the installer's pipe rather than your terminal, so `pev` detects no TTY and silently runs in `--yes` mode — accepting every discovered default without prompting. To install and then assess in one line, join them with `&&` so `pev` keeps your terminal:
+>
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/samcofer/pev/main/scripts/install.sh | sh && pev assess
+> ```
+>
+> For unattended/CI runs, accept the defaults explicitly with `pev assess --non-interactive` instead of relying on TTY detection.
 
 Pin a version or override the destination:
 

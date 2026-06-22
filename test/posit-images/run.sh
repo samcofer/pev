@@ -26,7 +26,6 @@ EOF
 CONNECT_ALLOWED=$(cat <<'EOF'
 pkg.libcurl-dev
 pkg.libxml2-dev
-connect.smtp.reachable
 EOF
 )
 

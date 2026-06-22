@@ -22,7 +22,7 @@ echo; echo "=== 4) uv venv as ubuntu ==="
 runuser -u ubuntu -- sh -c 'cd && uv --version && D=$(mktemp -d) && uv venv --python /opt/python/cpython-3.12.12-linux-x86_64-gnu/bin/python "$D/.venv" 2>&1; rm -rf "$D"'
 
 echo; echo "=== 5) renv install as ubuntu ==="
-runuser -u ubuntu -- sh -c 'cd && D=$(mktemp -d) && /opt/R/4.5.2/bin/R --vanilla --no-save --slave -e "install.packages(\"renv\", repos=\"https://packagemanager.posit.co/cran/__linux__/noble/latest\", lib=\"$D\"); library(\"renv\", lib.loc=\"$D\")" 2>&1 | tail -20; rm -rf "$D"'
+runuser -u ubuntu -- sh -c 'cd && D=$(mktemp -d) && /opt/R/4.5.2/bin/R --vanilla --no-save --slave -e "install.packages(\"renv\", repos=\"https://packagemanager.posit.co/cran/latest\", lib=\"$D\"); library(\"renv\", lib.loc=\"$D\")" 2>&1 | tail -20; rm -rf "$D"'
 
 echo; echo "=== 6) packages ==="
 dpkg -l libssl-dev libcurl4-openssl-dev libxml2-dev 2>&1 | tail -10
