@@ -46,10 +46,18 @@ type HostFacts struct {
 	LatestPython string `json:"latest_python,omitempty"`
 
 	// PPMLinuxSlug is the `__linux__` distro slug Posit Package Manager
-	// uses in repo URLs (jammy, noble, rhel9, etc). Computed from OS at
-	// Gather time so YAML packs can write
+	// uses in binary repo URLs (jammy, noble, rhel9, etc). Computed from OS
+	// at Gather time so YAML packs can write
 	// `https://packagemanager.posit.co/cran/__linux__/{{ .Facts.PPMLinuxSlug }}/latest`
-	// and have the right binary repo per host.
+	// and target the right binary repo per host.
+	//
+	// IMPORTANT: this is the empty string on any OS pev does not recognize
+	// (Pop!_OS and other derivatives, unknown distros) — PPM only publishes
+	// binaries for the handful of distros in ppmLinuxSlug. A pack that
+	// interpolates this into a URL without an applies_to.os gate will emit a
+	// malformed `__linux__//latest` URL on those hosts. The built-in renv
+	// check deliberately uses the source repo (no slug) so it stays portable
+	// across every host; reserve the binary slug for OS-gated packs.
 	PPMLinuxSlug string `json:"ppm_linux_slug,omitempty"`
 }
 
