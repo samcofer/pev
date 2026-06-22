@@ -18,10 +18,21 @@ func init() {
 
 // runPort opens a TCP connection to host:port and reports reachability.
 // Equivalent to `nc -vz host port` but built-in.
+//
+// The host guard mirrors x509/postgres: a missing `host` key is a YAML
+// authoring bug (UNKNOWN), but a key that is present yet empty means the SE
+// declined the input the host templates against (e.g. the SMTP confirm), so
+// the check SKIPs rather than firing a misleading UNKNOWN/investigation.
 func runPort(rc checks.RunCtx) checks.Result {
-	host, ok := getString(rc.Check.With, "host")
-	if !ok || host == "" {
+	host, present := getString(rc.Check.With, "host")
+	if !present {
 		return unknownf(rc.Check, "missing required `host` field")
+	}
+	if host == "" {
+		return checks.Result{
+			ID: rc.Check.ID, Title: rc.Check.Title,
+			Status: checks.StatusSkip, Reason: "host input is empty (no value supplied)",
+		}
 	}
 	port, ok := getInt(rc.Check.With, "port")
 	if !ok || port == 0 {

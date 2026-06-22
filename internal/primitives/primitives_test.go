@@ -76,6 +76,41 @@ func TestPostgresSkipsWithoutHost(t *testing.T) {
 	}
 }
 
+// TestPortSkipsWithEmptyHost is the SMTP-decline backstop: the connect SMTP
+// check wires host from {{ .Inputs.connect_smtp_host }}, which is pre-seeded
+// to "" and left empty when the SE declines the SMTP prompt. An empty host is
+// a declined input, not a YAML bug, so the port primitive must SKIP — not
+// UNKNOWN — mirroring x509's empty-cert_path and postgres's empty-host paths.
+// Regression guard for Ralf's "[UNKN] connect.smtp.reachable" report.
+func TestPortSkipsWithEmptyHost(t *testing.T) {
+	c := checks.Check{
+		ID: "connect.smtp.reachable", Title: "SMTP server reachable from Connect host",
+		Primitive: "port",
+		With:      map[string]interface{}{"host": "", "port": 587},
+	}
+	r := runRC(t, c, discover.HostFacts{})
+	if r.Status != checks.StatusSkip {
+		t.Fatalf("port with empty host should SKIP, got %s/%s", r.Status, r.Reason)
+	}
+	if !strings.Contains(r.Reason, "empty") {
+		t.Fatalf("SKIP reason should name the empty input, got %q", r.Reason)
+	}
+}
+
+// TestPortUnknownWhenHostKeyAbsent keeps the other half of the contract: a
+// genuinely missing `host` key is a catalog authoring bug and must stay
+// UNKNOWN, not collapse into the declined-input SKIP above.
+func TestPortUnknownWhenHostKeyAbsent(t *testing.T) {
+	c := checks.Check{
+		ID: "x", Title: "x", Primitive: "port",
+		With: map[string]interface{}{"port": 587},
+	}
+	r := runRC(t, c, discover.HostFacts{})
+	if r.Status != checks.StatusUnknown {
+		t.Fatalf("port with absent host key should UNKNOWN, got %s/%s", r.Status, r.Reason)
+	}
+}
+
 // TestPostgresFailsOnUnreachable points at a deliberately closed port so
 // the dial returns ECONNREFUSED quickly. We pick port 1 (rfc-reserved,
 // listener-impossible-for-non-root) and a 1s timeout so the test runs
