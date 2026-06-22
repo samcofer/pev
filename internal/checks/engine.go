@@ -105,7 +105,7 @@ func (e *Engine) runOne(ctx context.Context, c Check) Result {
 	}
 	if missing := missingRequires(c.AppliesTo.Requires, e.Facts); missing != "" {
 		base.Status = StatusSkip
-		base.Reason = "missing required tooling: " + missing
+		base.Reason = missingRequiresReason(missing)
 		return finish(base)
 	}
 	if c.RequiresRoot && !system.IsRoot() {
@@ -181,6 +181,24 @@ func contains(set []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// missingRequiresReason renders the SE-facing skip reason for an unmet
+// `requires` token. The command-gated tokens (uv, pip, apt, dnf) are
+// detected with a bare $PATH lookup (exec.LookPath), so a tool that exists
+// only under a versioned prefix like /opt/python/<ver>/bin is invisible to
+// the gate — and to the user who types `pip`. Spell that out so the
+// --review-skipped reader knows the fix is "put it on PATH", not "it isn't
+// installed anywhere". The scanned tokens (r, python, quarto) come from an
+// /opt/<tool> scan, not PATH, so they keep the generic wording.
+func missingRequiresReason(token string) string {
+	switch token {
+	case "uv", "pip", "apt", "dnf":
+		return fmt.Sprintf("%s is not on PATH; pev probes for it with a bare command lookup, "+
+			"so it must be on PATH (an interpreter under /opt/python/<ver>/bin is not enough) for pev to test it", token)
+	default:
+		return "missing required tooling: " + token
+	}
 }
 
 // missingRequires returns the first required-fact token that the host

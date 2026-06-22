@@ -285,3 +285,29 @@ func TestMissingRequires(t *testing.T) {
 		})
 	}
 }
+
+// TestMissingRequiresReason proves the command-gated tokens (detected via a
+// bare $PATH lookup) get a skip reason that tells the SE the fix is to put
+// the tool on PATH — a versioned interpreter under /opt is not enough — while
+// the /opt-scanned tokens keep the generic "missing required tooling" wording.
+func TestMissingRequiresReason(t *testing.T) {
+	for _, tc := range []struct {
+		token   string
+		wantSub string
+	}{
+		{"pip", "not on PATH"},
+		{"uv", "not on PATH"},
+		{"apt", "not on PATH"},
+		{"dnf", "not on PATH"},
+		{"r", "missing required tooling: r"},
+		{"python", "missing required tooling: python"},
+		{"quarto", "missing required tooling: quarto"},
+	} {
+		t.Run(tc.token, func(t *testing.T) {
+			got := missingRequiresReason(tc.token)
+			if !strings.Contains(got, tc.wantSub) {
+				t.Errorf("missingRequiresReason(%q) = %q, want substring %q", tc.token, got, tc.wantSub)
+			}
+		})
+	}
+}
