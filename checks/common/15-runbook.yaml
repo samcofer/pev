@@ -52,9 +52,12 @@ checks:
     why: |
       Unsubscribed RHEL hosts can't `dnf install` from upstream, which
       means every Posit installer subcommand fails before it starts.
-      UBI variants and binary-compatible rebuilds (Alma, Rocky, Oracle,
-      CentOS Stream) don't need a subscription, so this check SKIPs on
-      those distros and only enforces on stock RHEL.
+      UBI variants, the binary-compatible rebuilds (Alma, Rocky, Oracle),
+      and CentOS don't use Red Hat subscriptions, so this check SKIPs on
+      those distros and only enforces on stock RHEL. Cloud
+      marketplace/PAYG RHEL (AWS/Azure/GCP) gets packages via Red Hat
+      Update Infrastructure (RHUI) and is never registered with
+      subscription-manager, so a RHUI host PASSes without it.
     remediation: |
       Run `subscription-manager register --username=<user> --password=<pw>`
       (or attach via Activation Key) and `subscription-manager attach
@@ -65,21 +68,37 @@ checks:
     with:
       # The engine normalizes Alma/Rocky/Oracle/CentOS to rhel-<major>, so
       # applies_to.os alone can't distinguish them from stock RHEL. We re-read
-      # /etc/os-release here and skip_exit=2 on rebuilds — subscription-manager
-      # is a Red-Hat-specific concept.
+      # /etc/os-release here and skip_exit=2 on everything that isn't
+      # rhel/redhat — subscription-manager is a Red-Hat-specific concept.
+      #
+      # Cloud PAYG RHEL is entitled through RHUI, not subscription-manager:
+      # on those hosts `subscription-manager status` reports "Unknown" and
+      # exits 1 even though dnf installs fine (we install Posit deps from the
+      # RHUI repos every day). Detect RHUI first — via the rh-*-rhui-client
+      # package or the /etc/yum.repos.d/redhat-rhui*.repo files AWS/Azure/GCP
+      # drop in — and PASS, before falling through to subscription-manager.
       cmd: |
         . /etc/os-release 2>/dev/null
         case "${ID:-}" in
           rhel|redhat) ;;
           *) echo "ID=${ID:-unknown}; subscription-manager applies only to stock RHEL"; exit 2 ;;
         esac
+        if rpm -qa 'rh-*-rhui-client*' 2>/dev/null | grep -q . \
+           || ls /etc/yum.repos.d/redhat-rhui*.repo >/dev/null 2>&1; then
+          echo "RHUI-entitled cloud RHEL (PAYG) — packages served via Red Hat Update Infrastructure, no subscription-manager registration required"
+          exit 0
+        fi
         if ! command -v subscription-manager >/dev/null 2>&1; then
           echo "subscription-manager not installed on a host that identifies as RHEL"
           exit 1
         fi
-        subscription-manager status 2>&1
+        if subscription-manager status 2>&1 | grep -q 'Overall Status: Current'; then
+          echo "subscription-manager reports Overall Status: Current"
+          exit 0
+        fi
+        echo "RHEL host is not RHUI-entitled and subscription-manager is not Current — register/attach before installing"
+        exit 1
       expect_exit: 0
-      expect_stdout_regex: 'Overall Status: Current'
       skip_exit: 2
       timeout_seconds: 10
 

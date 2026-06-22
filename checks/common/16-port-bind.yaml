@@ -22,7 +22,9 @@ checks:
       can't bind transiently, the install will fail at `systemctl
       start rstudio-server` with a confusing "address already in use"
       or "permission denied" error. If rstudio-server already owns
-      the port (post-install runs of pev), that counts as PASS.
+      the port (post-install runs of pev), that counts as PASS. The
+      actual listener process is rserver-http (the HTTP front-end that
+      rserver execs), so it is on the expected-owner list too.
     remediation: |
       Run `ss -ltnp 'sport = :8787'` to identify the conflicting
       listener. For SELinux: `audit2allow -a` will surface a denial;
@@ -35,7 +37,7 @@ checks:
       host: 0.0.0.0
       port: 8787
       timeout_seconds: 2
-      owned_by: [rstudio-server, rserver]
+      owned_by: [rstudio-server, rserver, rserver-http]
 
   - id: net.bind.connect-3939
     title: Connect default port 3939 is bindable

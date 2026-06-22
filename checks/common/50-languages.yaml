@@ -105,7 +105,7 @@ checks:
         trap 'rm -rf "$D"' EXIT
         export D
         {{ .Facts.LatestR }} --vanilla --no-save --slave -e \
-          'lib <- Sys.getenv("D"); install.packages("renv", repos="https://packagemanager.posit.co/cran/__linux__/{{ .Facts.PPMLinuxSlug }}/latest", lib=lib); library("renv", lib.loc=lib)'
+          'lib <- Sys.getenv("D"); install.packages("renv", repos="https://packagemanager.posit.co/cran/latest", lib=lib); library("renv", lib.loc=lib)'
       expect_exit: 0
       timeout_seconds: 120
 
