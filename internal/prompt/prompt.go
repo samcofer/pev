@@ -13,6 +13,7 @@
 package prompt
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -53,11 +54,23 @@ type surveyDriver struct{ mode Mode }
 
 // New returns a Driver. Pass mode based on --non-interactive / --yes flags.
 // If mode is ModeInteractive but stdin/stdout aren't a TTY, the driver
-// silently downgrades to ModeYes — surveys would error out otherwise and
-// we want pev to remain useful when piped or in CI.
+// downgrades to ModeYes — surveys would error out otherwise and we want pev
+// to remain useful when piped or in CI.
+//
+// The downgrade is announced on stderr, not just the logrus file logger:
+// logging.Init redirects logrus to the log file before this runs, so a
+// log-only notice is invisible on the terminal. An SE who accidentally pipes
+// the installer into pev (`curl ... | sh | pev assess`) hands pev a non-TTY
+// stdin and gets silent default-acceptance with no prompts; the stderr line
+// tells them why. We only emit it for the *implicit* downgrade — an explicit
+// --yes / --non-interactive run (ModeYes / ModeNonInteractive) stays quiet so
+// intentional CI pipelines are not noisy. Stderr (not stdout) keeps the
+// Markdown report on stdout clean for email/PR round-tripping.
 func New(mode Mode) Driver {
 	if mode == ModeInteractive && !isTerminal() {
 		log.Info("stdin or stdout is not a terminal; using --yes mode for prompts")
+		fmt.Fprintln(os.Stderr, "pev: stdin/stdout is not a TTY; running in --yes mode (accepting discovered defaults). "+
+			"Run pev directly on a terminal to be prompted, or pass --non-interactive to silence this notice.")
 		mode = ModeYes
 	}
 	return &surveyDriver{mode: mode}
@@ -158,7 +171,14 @@ func (s *surveyDriver) MultiSelect(question string, options, defaultValues []str
 		logQA(question, defaultValues)
 		return defaultValues, nil
 	}
-	out := append([]string{}, defaultValues...)
+	// IMPORTANT: start from an empty slice, NOT a copy of defaultValues.
+	// survey/v2 writes a MultiSelect result by *appending* each chosen
+	// option to the destination slice (see survey/core.WriteAnswer's
+	// list-copy path), so a pre-seeded `out` comes back with every
+	// pre-selected default duplicated — the caller then renders
+	// "connect, connect". survey.Default already seeds the on-screen
+	// pre-selection; the destination only needs to receive the result.
+	var out []string
 	p := &survey.MultiSelect{Message: question, Options: options, Default: defaultValues}
 	if err := survey.AskOne(p, &out, survey.WithRemoveSelectAll(), survey.WithRemoveSelectNone()); err != nil {
 		return nil, err
