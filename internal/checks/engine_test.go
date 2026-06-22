@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"bytes"
 	"context"
 	"strings"
 	"testing"
@@ -65,6 +66,67 @@ func TestAppliesTo(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestRunProgressMarksActualSkips proves the progress stream tags
+// "(skipped)" from each check's REAL outcome, so the on-screen markers
+// reconcile with the report's SKIP tally. The regression it guards: the
+// previous printer predicted skips from host facts alone and so missed
+// input-gated skips — a check whose templated input expands empty (a
+// declined opt-in prompt) ran clean per the gates but SKIPs at runtime,
+// and printed as if it had run.
+func TestRunProgressMarksActualSkips(t *testing.T) {
+	var buf bytes.Buffer
+	e := Engine{
+		Facts:    discover.HostFacts{OS: "rhel-9"},
+		Progress: &buf,
+	}
+	checks := []Check{
+		// Runs to completion — no "(skipped)" suffix.
+		{ID: "a.ran", Title: "ran", Primitive: "test-fake",
+			With: map[string]interface{}{"expect": "pass"}},
+		// Static applies_to gate — skips.
+		{ID: "b.os-gated", Title: "os", Primitive: "test-fake",
+			AppliesTo: AppliesTo{OS: []string{"ubuntu-22.04"}},
+			With:      map[string]interface{}{"expect": "pass"}},
+		// Input-gated skip: the template references an input the SE never
+		// supplied, so expandWith fails and runOne SKIPs. The old
+		// fact-only predictor printed this as if it ran.
+		{ID: "c.input-gated", Title: "input", Primitive: "test-fake",
+			With: map[string]interface{}{"name": "{{ .Inputs.declined }}", "expect": "pass"}},
+	}
+	results := e.Run(context.Background(), checks)
+
+	lines := map[string]string{}
+	for _, ln := range strings.Split(strings.TrimSpace(buf.String()), "\n") {
+		for _, id := range []string{"a.ran", "b.os-gated", "c.input-gated"} {
+			if strings.Contains(ln, id) {
+				lines[id] = ln
+			}
+		}
+	}
+	if strings.Contains(lines["a.ran"], "(skipped)") {
+		t.Errorf("a.ran should not be marked skipped: %q", lines["a.ran"])
+	}
+	if !strings.Contains(lines["b.os-gated"], "(skipped)") {
+		t.Errorf("b.os-gated should be marked skipped: %q", lines["b.os-gated"])
+	}
+	if !strings.Contains(lines["c.input-gated"], "(skipped)") {
+		t.Errorf("c.input-gated should be marked skipped: %q", lines["c.input-gated"])
+	}
+
+	// Every printed "(skipped)" marker must correspond to a real SKIP
+	// result — the count on screen equals the count in the tally.
+	printed := strings.Count(buf.String(), "(skipped)")
+	actual := 0
+	for _, r := range results {
+		if r.Status == StatusSkip {
+			actual++
+		}
+	}
+	if printed != actual {
+		t.Fatalf("printed %d (skipped) markers but %d checks actually skipped", printed, actual)
 	}
 }
 

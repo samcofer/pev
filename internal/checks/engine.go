@@ -34,43 +34,38 @@ type Engine struct {
 func (e *Engine) Run(ctx context.Context, all []Check) []Result {
 	out := make([]Result, 0, len(all))
 	for i, c := range all {
+		// Emit the "[i/N] label" prefix BEFORE running so the SE sees
+		// something happening during long-running primitives (apt
+		// update, dnf makecache, uv venv, renv install) and knows pev
+		// hasn't hung. The line is left open (no newline) and closed
+		// after the check resolves.
 		if e.Progress != nil {
 			label := c.ID
 			if c.ShortDescription != "" {
 				label = fmt.Sprintf("%s (%s)", c.ShortDescription, c.ID)
 			}
-			// Pre-emit a "(skipped)" tag for checks that the engine
-			// will gate out before the primitive even runs. Saves the
-			// SE from wondering why a clearly-not-applicable check
-			// (e.g. a dnf check on Ubuntu) showed up in the progress
-			// stream with no follow-up reason.
-			prefix := ""
-			if willSkip(c, e.Facts) {
-				prefix = "(skipped) "
-			}
-			fmt.Fprintf(e.Progress, "[%d/%d] %s%s\n", i+1, len(all), prefix, label)
+			fmt.Fprintf(e.Progress, "[%d/%d] %s", i+1, len(all), label)
 		}
-		out = append(out, e.runOne(ctx, c))
+		res := e.runOne(ctx, c)
+		// Close the line from the check's ACTUAL outcome — the only
+		// source of truth. A "(skipped)" suffix here therefore always
+		// matches the report's SKIP tally, whether the skip came from a
+		// static gate (applies_to/requires/requires_root), a declined
+		// prompt (an input templated empty), or a runtime self-skip
+		// (a cmd script's skip_exit). The previous design predicted the
+		// skip from host facts alone, which silently disagreed with the
+		// summary for input- and runtime-gated skips.
+		if e.Progress != nil {
+			if res.Status == StatusSkip {
+				fmt.Fprint(e.Progress, " (skipped)\n")
+			} else {
+				fmt.Fprint(e.Progress, "\n")
+			}
+		}
+		out = append(out, res)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out
-}
-
-// willSkip mirrors the gating logic at the top of runOne so the progress
-// printer can flag a check before the primitive is dispatched. Kept in
-// sync with runOne's gates: applies_to (os/arch), requires (host facts),
-// and requires_root.
-func willSkip(c Check, hf discover.HostFacts) bool {
-	if appliesTo(c.AppliesTo, hf) != "" {
-		return true
-	}
-	if missingRequires(c.AppliesTo.Requires, hf) != "" {
-		return true
-	}
-	if c.RequiresRoot && !system.IsRoot() {
-		return true
-	}
-	return false
 }
 
 func (e *Engine) runOne(ctx context.Context, c Check) Result {
