@@ -172,9 +172,10 @@ func newAssessCmd() *cobra.Command {
 			// happening during long-running checks like apt update or
 			// uv venv creation.
 			eng := checks.Engine{
-				Facts:    facts,
-				Inputs:   inputs,
-				Progress: os.Stderr,
+				Facts:         facts,
+				Inputs:        inputs,
+				Progress:      os.Stderr,
+				ProgressColor: isTerminal(os.Stderr),
 			}
 			results := eng.Run(ctx, filtered)
 

@@ -130,6 +130,48 @@ func TestRunProgressMarksActualSkips(t *testing.T) {
 	}
 }
 
+// TestRunProgressColorWrapsSkipSuffix proves ProgressColor wraps only the
+// "(skipped)" suffix in yellow (and resets), leaving lines for checks that
+// ran uncolored. With color off the suffix stays a bare string so piped /
+// non-TTY runs and the report tally remain plain-text greppable.
+func TestRunProgressColorWrapsSkipSuffix(t *testing.T) {
+	run := func(color bool) string {
+		var buf bytes.Buffer
+		e := Engine{
+			Facts:         discover.HostFacts{OS: "rhel-9"},
+			Progress:      &buf,
+			ProgressColor: color,
+		}
+		e.Run(context.Background(), []Check{
+			{ID: "a.ran", Title: "ran", Primitive: "test-fake",
+				With: map[string]interface{}{"expect": "pass"}},
+			{ID: "b.os-gated", Title: "os", Primitive: "test-fake",
+				AppliesTo: AppliesTo{OS: []string{"ubuntu-22.04"}},
+				With:      map[string]interface{}{"expect": "pass"}},
+		})
+		return buf.String()
+	}
+
+	colored := run(true)
+	if !strings.Contains(colored, progressYellow+"(skipped)"+progressReset) {
+		t.Errorf("colored run should wrap the skip suffix in yellow:\n%q", colored)
+	}
+	// The line for the check that ran carries no color codes.
+	for _, ln := range strings.Split(colored, "\n") {
+		if strings.Contains(ln, "a.ran") && strings.Contains(ln, progressYellow) {
+			t.Errorf("non-skip line must not be colored: %q", ln)
+		}
+	}
+
+	plain := run(false)
+	if strings.Contains(plain, progressYellow) || strings.Contains(plain, progressReset) {
+		t.Errorf("color-off run must emit no ANSI codes:\n%q", plain)
+	}
+	if !strings.Contains(plain, " (skipped)") {
+		t.Errorf("color-off run must still mark skips in plain text:\n%q", plain)
+	}
+}
+
 func TestEngineExpandsTemplate(t *testing.T) {
 	e := Engine{
 		Facts:  discover.HostFacts{Hostname: "h1"},

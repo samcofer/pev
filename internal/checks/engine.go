@@ -26,7 +26,21 @@ type Engine struct {
 	// renv install) so the SE knows pev hasn't hung. Final per-check
 	// status is NOT emitted — that lives in the report.
 	Progress io.Writer
+
+	// ProgressColor enables ANSI color on the progress stream — set by the
+	// caller from a TTY/NO_COLOR check on the Progress writer. When true the
+	// "(skipped)" suffix is rendered yellow so skips stand out from the
+	// checks that actually ran.
+	ProgressColor bool
 }
+
+// ANSI codes for the progress stream. Kept local to this package because
+// internal/report imports internal/checks (not the reverse), so we cannot
+// reach for report's color helpers without an import cycle.
+const (
+	progressYellow = "\033[33m"
+	progressReset  = "\033[0m"
+)
 
 // Run filters checks by AppliesTo, gates root-only checks, expands templates
 // in `with:`, dispatches to the registered primitive, and returns Results
@@ -57,7 +71,11 @@ func (e *Engine) Run(ctx context.Context, all []Check) []Result {
 		// summary for input- and runtime-gated skips.
 		if e.Progress != nil {
 			if res.Status == StatusSkip {
-				fmt.Fprint(e.Progress, " (skipped)\n")
+				suffix := " (skipped)"
+				if e.ProgressColor {
+					suffix = " " + progressYellow + "(skipped)" + progressReset
+				}
+				fmt.Fprint(e.Progress, suffix+"\n")
 			} else {
 				fmt.Fprint(e.Progress, "\n")
 			}

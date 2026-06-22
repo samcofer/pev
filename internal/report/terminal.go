@@ -23,7 +23,9 @@ const (
 // RenderTerminal writes the human-facing summary view to w. Shows the
 // totals table, then per-category sections that include only failing or
 // unknown checks (PASS/SKIP are still in the on-disk Markdown). Output
-// is parseable: each finding line is `[STATUS]\tID\tTITLE`.
+// is parseable: each finding line is `[STATUS] TITLE (ID)` — the title
+// reads first, with the dotted id in parens, mirroring the progress
+// stream's "<short_description> (<id>)" convention.
 func RenderTerminal(w io.Writer, rep checks.Report, color bool) {
 	red := func(s string) string { return wrap(s, ansiRed, color) }
 	yellow := func(s string) string { return wrap(s, ansiYellow, color) }
@@ -87,7 +89,7 @@ func RenderTerminal(w io.Writer, rep checks.Report, color bool) {
 			case checks.StatusWarn:
 				tag, colour = "[WARN]", yellow
 			}
-			line := fmt.Sprintf("  %s\t%s\t%s", tag, r.ID, r.Title)
+			line := fmt.Sprintf("  %s %s (%s)", tag, r.Title, r.ID)
 			fmt.Fprintln(w, colour(line))
 			if r.Reason != "" {
 				fmt.Fprintf(w, "    %s %s\n", yellow("reason:"), r.Reason)
@@ -141,7 +143,7 @@ func RenderSkipped(w io.Writer, rep checks.Report, color bool) {
 		sort.Slice(rs, func(i, j int) bool { return rs[i].ID < rs[j].ID })
 		fmt.Fprintf(w, "%s (%d skipped)\n", bold(cat), len(rs))
 		for _, r := range rs {
-			line := fmt.Sprintf("  %s\t%s\t%s", "[SKIP]", r.ID, r.Title)
+			line := fmt.Sprintf("  %s %s (%s)", "[SKIP]", r.Title, r.ID)
 			fmt.Fprintln(w, yellow(line))
 			reason := r.Reason
 			if reason == "" {

@@ -128,8 +128,8 @@ func TestRenderTerminalMixedFailAndWarn(t *testing.T) {
 	if !strings.Contains(out, "2 failing, 1 warning(s)") {
 		t.Errorf("mixed category header tally wrong; want '2 failing, 1 warning(s)':\n%s", out)
 	}
-	// Each status renders with its own distinct tag.
-	for _, tag := range []string{"[FAIL]\tnet.egress.cdn-rstudio", "[WARN]\tz.advisory.note", "[UNKN]\tz.undecided"} {
+	// Each status renders with its own distinct tag and the id in parens.
+	for _, tag := range []string{"[FAIL]", "(net.egress.cdn-rstudio)", "[WARN]", "(z.advisory.note)", "[UNKN]", "(z.undecided)"} {
 		if !strings.Contains(out, tag) {
 			t.Errorf("missing rendered row %q:\n%s", tag, out)
 		}
