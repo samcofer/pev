@@ -38,6 +38,51 @@ func TestCmdPrimitivePassFail(t *testing.T) {
 	}
 }
 
+// TestCmdPrimitiveWarnExit proves warn_exit resolves a matching exit code to
+// an advisory WARN (not FAIL), with the script's last line as the reason, and
+// that a non-matching exit code still flows through expect_exit. This is the
+// sibling of skip_exit, used by lang.python.venv-tooling to flag "no uv/pip on
+// PATH" without failing an otherwise-installable host.
+func TestCmdPrimitiveWarnExit(t *testing.T) {
+	warn := checks.Check{
+		ID: "x", Title: "x", Primitive: "cmd",
+		With: map[string]interface{}{
+			"cmd":         "echo 'neither uv nor pip on PATH'; exit 2",
+			"expect_exit": 0, "warn_exit": 2,
+		},
+	}
+	r := runRC(t, warn, discover.HostFacts{})
+	if r.Status != checks.StatusWarn {
+		t.Fatalf("warn_exit match should WARN, got %s/%s", r.Status, r.Reason)
+	}
+	if !strings.Contains(r.Reason, "neither uv nor pip") {
+		t.Fatalf("WARN reason should carry the script's last line, got %q", r.Reason)
+	}
+
+	// exit 0 with warn_exit set still PASSes (the tool was found).
+	pass := checks.Check{
+		ID: "x", Title: "x", Primitive: "cmd",
+		With: map[string]interface{}{
+			"cmd": "echo found; exit 0", "expect_exit": 0, "warn_exit": 2,
+		},
+	}
+	if r := runRC(t, pass, discover.HostFacts{}); r.Status != checks.StatusPass {
+		t.Fatalf("exit 0 with warn_exit set should PASS, got %s/%s", r.Status, r.Reason)
+	}
+
+	// A non-matching, non-zero exit is neither warn nor the expected code →
+	// FAIL, so warn_exit never masks a genuine failure.
+	fail := checks.Check{
+		ID: "x", Title: "x", Primitive: "cmd",
+		With: map[string]interface{}{
+			"cmd": "echo broke; exit 1", "expect_exit": 0, "warn_exit": 2,
+		},
+	}
+	if r := runRC(t, fail, discover.HostFacts{}); r.Status != checks.StatusFail {
+		t.Fatalf("exit 1 (not warn_exit, not expect_exit) should FAIL, got %s/%s", r.Status, r.Reason)
+	}
+}
+
 func TestFilePrimitiveExistence(t *testing.T) {
 	tmp := filepath.Join(t.TempDir(), "exists")
 	if err := os.WriteFile(tmp, []byte("ssl-enabled=1\n"), 0o644); err != nil {

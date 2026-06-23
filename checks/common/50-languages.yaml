@@ -109,6 +109,49 @@ checks:
       expect_exit: 0
       timeout_seconds: 120
 
+  - id: lang.python.venv-tooling
+    title: A Python venv tool (uv or pip) is on PATH
+    short_description: Checking uv or pip is on PATH
+    category: Product
+    tags: [python, user-install]
+    applies_to:
+      requires: [python]
+    why: |
+      Creating a virtual environment needs either uv (Posit's recommended
+      tool) or pip on PATH. If neither is on PATH, pev cannot run the venv
+      creation smoke test — the host is still installable (a versioned
+      Python under /opt/python exists), but an unprivileged user typing
+      `uv` or `pip` would hit command-not-found, so this is surfaced as an
+      advisory. Install uv, or put pip on PATH (e.g. apt install
+      python3-pip / a /opt/python/<ver>/bin on PATH), to enable the
+      lang.python.uv-venv or lang.python.pip-venv smoke test.
+    remediation: |
+      Install uv (https://docs.posit.co/resources/install-python-uv.html)
+      or ensure pip/pip3 is on PATH. A versioned Python under
+      /opt/python/<ver>/bin ships pip but is intentionally off PATH; add
+      that bin dir to PATH or install the system python3-pip package.
+    references:
+      - https://docs.posit.co/resources/install-python-uv.html
+    primitive: cmd
+    with:
+      # PASS when either tool is reachable as a bare command — the same
+      # $PATH visibility a user gets. WARN (exit 2) when neither is, so the
+      # run stays green-but-noted rather than failing an installable host.
+      cmd: |
+        if command -v uv >/dev/null 2>&1; then
+          echo "uv on PATH: $(command -v uv)"
+          exit 0
+        fi
+        if command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
+          echo "pip on PATH: $(command -v pip3 || command -v pip)"
+          exit 0
+        fi
+        echo "neither uv nor pip is on PATH; venv smoke test will be skipped (install uv or put pip on PATH)"
+        exit 2
+      expect_exit: 0
+      warn_exit: 2
+      timeout_seconds: 5
+
   - id: lang.python.uv-venv
     title: Unprivileged user can create a uv venv with the latest Python
     short_description: Creating a uv venv as the unprivileged user
@@ -120,9 +163,9 @@ checks:
       uv is Posit's recommended Python venv tool. A failure here usually
       means $HOME is noexec, the user has no shell home directory, or
       PyPI egress is blocked — all install-blockers worth catching
-      pre-flight. Runs from and writes under $HOME so the check
-      exercises the same path users actually use. Cleaned up on both
-      success and failure via trap.
+      pre-flight. Gated on uv being present (see lang.python.venv-tooling);
+      runs from and writes under $HOME so the check exercises the same path
+      users actually use. Cleaned up on both success and failure via trap.
     primitive: cmd
     with:
       as_user: "{{ .Inputs.unprivileged_user }}"
@@ -148,12 +191,12 @@ checks:
       # check above is the more authoritative signal.
       requires: [python, pip]
     why: |
-      When uv is unavailable, the fallback path is `python -m venv` plus
-      `pip install`. This check fires only when uv is absent. Catches
-      missing python3-venv (Ubuntu) and outbound PyPI blockers. Runs
-      from and writes under $HOME so the check exercises the same path
-      users actually use. Cleaned up on both success and failure via
-      trap.
+      The fallback path when uv is unavailable is `python -m venv` plus
+      `pip install`. Gated on pip being present (see
+      lang.python.venv-tooling). Catches missing python3-venv (Ubuntu) and
+      outbound PyPI blockers. Runs from and writes under $HOME so the check
+      exercises the same path users actually use. Cleaned up on both
+      success and failure via trap.
     primitive: cmd
     with:
       as_user: "{{ .Inputs.unprivileged_user }}"

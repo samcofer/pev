@@ -15,7 +15,7 @@ import (
 func init() {
 	checks.Register("cmd", runCmd, []string{
 		"cmd", "expect_exit", "expect_stdout_regex", "expect_stderr_regex",
-		"timeout_seconds", "as_user", "skip_exit",
+		"timeout_seconds", "as_user", "skip_exit", "warn_exit",
 	})
 }
 
@@ -104,6 +104,19 @@ func runCmd(rc checks.RunCtx) checks.Result {
 			reason = fmt.Sprintf("script signalled skip (exit %d)", skip)
 		}
 		r.Reason = reason
+		return r
+	}
+
+	// `warn_exit` is the advisory sibling of skip_exit: a matching exit code
+	// resolves the check to WARN (visible, not exit-fatal) rather than FAIL.
+	// Lets a YAML author say "the host is installable as-is, but note this"
+	// from inside the script — e.g. a recommended tool (uv) is absent so a
+	// fallback path will be used. The script's last echoed line becomes the
+	// advisory reason, matching the FAIL convention. Checked before
+	// expect_exit so a single non-zero code can mean WARN instead of FAIL.
+	if warn, ok := getInt(rc.Check.With, "warn_exit"); ok && res.ExitCode == warn {
+		r.Status = checks.StatusWarn
+		r.Reason = failReason(res, fmt.Sprintf("script signalled warning (exit %d)", warn))
 		return r
 	}
 
