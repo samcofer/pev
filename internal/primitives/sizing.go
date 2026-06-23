@@ -13,19 +13,27 @@ func init() {
 
 // runSizing compares discovered host facts against thresholds. No shell-outs;
 // values come from HostFacts populated during discovery.
+//
+// CPU and memory shortfalls are blocking (FAIL): the product will not run
+// acceptably below those minimums. A disk shortfall is advisory (WARN) —
+// disk is the easiest dimension to grow after the fact (attach a volume,
+// resize the filesystem, point a data dir elsewhere), so an undersized disk
+// is worth flagging without failing an otherwise-installable host. When both
+// kinds are present FAIL wins (the blocking dimension takes the floor) but
+// the disk shortfall is still named in the reason.
 func runSizing(rc checks.RunCtx) checks.Result {
 	r := checks.Result{
 		ID: rc.Check.ID, Title: rc.Check.Title,
 	}
-	var failures []string
+	var blocking, advisory []string
 
 	if min, ok := getInt(rc.Check.With, "cpus_min"); ok && rc.Facts.CPUs < min {
-		failures = append(failures, fmt.Sprintf("cpus=%d<min=%d", rc.Facts.CPUs, min))
+		blocking = append(blocking, fmt.Sprintf("cpus=%d<min=%d", rc.Facts.CPUs, min))
 	}
 	if min, ok := getInt(rc.Check.With, "mem_gb_min"); ok {
 		gotGB := rc.Facts.MemMB / 1024
 		if gotGB < min {
-			failures = append(failures, fmt.Sprintf("mem_gb=%d<min=%d", gotGB, min))
+			blocking = append(blocking, fmt.Sprintf("mem_gb=%d<min=%d", gotGB, min))
 		}
 	}
 	if disk, ok := rc.Check.With["disk_gb_min"].(map[string]interface{}); ok {
@@ -41,7 +49,7 @@ func runSizing(rc checks.RunCtx) checks.Result {
 			}
 			got := rc.Facts.DiskGB[mp]
 			if got < min {
-				failures = append(failures, fmt.Sprintf("disk_gb[%s]=%d<min=%d", mp, got, min))
+				advisory = append(advisory, fmt.Sprintf("disk_gb[%s]=%d<min=%d", mp, got, min))
 			}
 		}
 	}
@@ -49,9 +57,18 @@ func runSizing(rc checks.RunCtx) checks.Result {
 	r.Evidence = []checks.Evidence{{
 		Note: fmt.Sprintf("cpus=%d mem_mb=%d disk_gb=%v", rc.Facts.CPUs, rc.Facts.MemMB, rc.Facts.DiskGB),
 	}}
-	if len(failures) > 0 {
+
+	// CPU/memory shortfall is blocking. Surface any disk shortfall alongside
+	// it so the SE sees the full picture, but the status stays FAIL.
+	if len(blocking) > 0 {
 		r.Status = checks.StatusFail
-		r.Reason = strings.Join(failures, "; ")
+		r.Reason = strings.Join(append(blocking, advisory...), "; ")
+		return r
+	}
+	// Disk-only shortfall: advisory. Installable as-is, but note it.
+	if len(advisory) > 0 {
+		r.Status = checks.StatusWarn
+		r.Reason = strings.Join(advisory, "; ") + " (disk is advisory — grow the volume before going to production)"
 		return r
 	}
 	r.Status = checks.StatusPass

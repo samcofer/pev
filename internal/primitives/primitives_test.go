@@ -352,4 +352,38 @@ func TestSizingPrimitive(t *testing.T) {
 	if r.Status != checks.StatusFail || !strings.Contains(r.Reason, "cpus") {
 		t.Fatalf("expected cpu failure, got %s/%s", r.Status, r.Reason)
 	}
+
+	// Memory shortfall is also blocking → FAIL.
+	memFail := checks.Check{
+		ID: "x", Title: "x", Primitive: "sizing",
+		With: map[string]interface{}{"mem_gb_min": 16},
+	}
+	r = runRC(t, memFail, discover.HostFacts{CPUs: 4, MemMB: 8192, DiskGB: map[string]int{"/": 100}})
+	if r.Status != checks.StatusFail || !strings.Contains(r.Reason, "mem_gb") {
+		t.Fatalf("expected memory failure, got %s/%s", r.Status, r.Reason)
+	}
+
+	// Disk-only shortfall is advisory → WARN, not FAIL.
+	diskShort := checks.Check{
+		ID: "x", Title: "x", Primitive: "sizing",
+		With: map[string]interface{}{"cpus_min": 1, "mem_gb_min": 1, "disk_gb_min": map[string]interface{}{"/": 500}},
+	}
+	r = runRC(t, diskShort, discover.HostFacts{CPUs: 4, MemMB: 8192, DiskGB: map[string]int{"/": 100}})
+	if r.Status != checks.StatusWarn || !strings.Contains(r.Reason, "disk_gb") {
+		t.Fatalf("expected disk WARN, got %s/%s", r.Status, r.Reason)
+	}
+
+	// CPU shortfall + disk shortfall together → FAIL (blocking wins), but the
+	// disk shortfall is still named in the reason.
+	both := checks.Check{
+		ID: "x", Title: "x", Primitive: "sizing",
+		With: map[string]interface{}{"cpus_min": 100, "disk_gb_min": map[string]interface{}{"/": 500}},
+	}
+	r = runRC(t, both, discover.HostFacts{CPUs: 4, MemMB: 8192, DiskGB: map[string]int{"/": 100}})
+	if r.Status != checks.StatusFail {
+		t.Fatalf("cpu+disk shortfall should FAIL, got %s/%s", r.Status, r.Reason)
+	}
+	if !strings.Contains(r.Reason, "cpus") || !strings.Contains(r.Reason, "disk_gb") {
+		t.Fatalf("FAIL reason should name both cpu and disk shortfalls, got %q", r.Reason)
+	}
 }

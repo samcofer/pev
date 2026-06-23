@@ -3,6 +3,12 @@ schema_version: 3
 # recommendations. Anything below these values is testing/sandbox territory
 # only — production deployments should follow the "Recommended" tier in the
 # same article.
+#
+# Status split (see internal/primitives/sizing.go): CPU and memory shortfalls
+# are blocking (FAIL) — the product will not run acceptably below them. A disk
+# shortfall is advisory (WARN): disk is the easiest dimension to grow after the
+# fact (attach a volume, resize the fs, relocate a data dir), so it is flagged
+# without failing an otherwise-installable host.
 # Reference: https://support.posit.co/hc/en-us/articles/115002344588
 checks:
   - id: sizing.workbench.minimum
