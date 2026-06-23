@@ -86,7 +86,12 @@ checks:
       (Package Manager), and 5559 (Workbench / Connect Launcher). Without
       explicit `firewall-cmd --add-port` rules in a permanent zone, end
       users get connection-refused even though the product is running.
-      This check no-ops when firewalld is inactive (covered above).
+      The front-door HTTP(S) ports 80/443 are blocking (FAIL) — every
+      user reaches the products through them; the per-product ports
+      (8787/3939/4242/5559) are advisory (WARN), since a deployment may
+      front them with a reverse proxy on 80/443 and never expose them
+      directly. This check no-ops when firewalld is inactive (covered
+      above).
     remediation: |
       Open the ports your products use, e.g.
         sudo firewall-cmd --permanent --add-port=8787/tcp   # Workbench
@@ -111,7 +116,8 @@ checks:
         services=$(firewall-cmd --list-services 2>/dev/null)
         echo "ports=$ports"
         echo "services=$services"
-        missing=
+        missing_frontdoor=
+        missing_product=
         for p in 80 443 8787 3939 4242 5559; do
           # Match either explicit port rules or named services for 80/443.
           if echo "$ports" | grep -qwE "${p}/tcp"; then continue; fi
@@ -119,14 +125,25 @@ checks:
             80)  echo "$services" | grep -qw http  && continue ;;
             443) echo "$services" | grep -qw https && continue ;;
           esac
-          missing="$missing $p"
+          case "$p" in
+            80|443) missing_frontdoor="$missing_frontdoor $p" ;;
+            *)      missing_product="$missing_product $p" ;;
+          esac
         done
-        if [ -n "$missing" ]; then
-          echo "missing-ports:$missing"
+        # Front-door 80/443 blocked → FAIL (exit 1). Only product ports
+        # blocked → WARN (exit 2). Report both sets so the SE sees the full
+        # picture either way.
+        if [ -n "$missing_frontdoor" ]; then
+          echo "missing-frontdoor-ports:$missing_frontdoor${missing_product:+ (also product:$missing_product)}"
           exit 1
+        fi
+        if [ -n "$missing_product" ]; then
+          echo "missing-product-ports:$missing_product (front-door 80/443 open; product ports may be proxied — advisory)"
+          exit 2
         fi
         echo "all canonical Posit ports allowed"
       expect_exit: 0
+      warn_exit: 2
       timeout_seconds: 10
 
   - id: sec.iptables.inactive
@@ -153,8 +170,11 @@ checks:
       When the iptables service is active, the INPUT chain must accept
       80, 443, 8787, 3939, 4242, and 5559/tcp — either via a default
       ACCEPT policy, an explicit ACCEPT rule per port, or a stateful
-      ESTABLISHED,RELATED + per-port ACCEPT pair. No-ops when iptables
-      is inactive or absent.
+      ESTABLISHED,RELATED + per-port ACCEPT pair. The front-door HTTP(S)
+      ports 80/443 are blocking (FAIL); the per-product ports
+      (8787/3939/4242/5559) are advisory (WARN), since they may be fronted
+      by a reverse proxy on 80/443. No-ops when iptables is inactive or
+      absent.
     remediation: |
       Add per-port ACCEPT rules ahead of any DROP/REJECT, then persist:
         sudo iptables -I INPUT -p tcp --dport 8787 -j ACCEPT
@@ -181,18 +201,29 @@ checks:
           echo "INPUT policy ACCEPT with no DROP/REJECT rules"
           exit 0
         fi
-        missing=
+        missing_frontdoor=
+        missing_product=
         for p in 80 443 8787 3939 4242 5559; do
           if ! echo "$rules" | grep -qE "^-A INPUT.* --dport ${p}\b.* -j ACCEPT"; then
-            missing="$missing $p"
+            case "$p" in
+              80|443) missing_frontdoor="$missing_frontdoor $p" ;;
+              *)      missing_product="$missing_product $p" ;;
+            esac
           fi
         done
-        if [ -n "$missing" ]; then
-          echo "missing-ports:$missing"
+        # Front-door 80/443 blocked → FAIL (exit 1); only product ports
+        # blocked → WARN (exit 2).
+        if [ -n "$missing_frontdoor" ]; then
+          echo "missing-frontdoor-ports:$missing_frontdoor${missing_product:+ (also product:$missing_product)}"
           exit 1
+        fi
+        if [ -n "$missing_product" ]; then
+          echo "missing-product-ports:$missing_product (front-door 80/443 open; product ports may be proxied — advisory)"
+          exit 2
         fi
         echo "all canonical Posit ports allowed"
       expect_exit: 0
+      warn_exit: 2
       timeout_seconds: 10
 
   - id: sec.nftables.inactive
@@ -218,8 +249,11 @@ checks:
     why: |
       When nftables is active, the input chain must accept 80, 443, 8787,
       3939, 4242, and 5559/tcp via explicit `tcp dport <port> accept`
-      statements or a per-port set membership rule. No-ops when nftables
-      is inactive or absent.
+      statements or a per-port set membership rule. The front-door HTTP(S)
+      ports 80/443 are blocking (FAIL); the per-product ports
+      (8787/3939/4242/5559) are advisory (WARN), since they may be fronted
+      by a reverse proxy on 80/443. No-ops when nftables is inactive or
+      absent.
     remediation: |
       Add per-port accept rules to your input chain, e.g.
         nft add rule inet filter input tcp dport {80,443,8787,3939,4242,5559} accept
@@ -238,17 +272,28 @@ checks:
           echo "ruleset empty; default-permit"; exit 0
         fi
         echo "$rs" | head -80
-        missing=
+        missing_frontdoor=
+        missing_product=
         for p in 80 443 8787 3939 4242 5559; do
           # Match either an explicit "tcp dport <p>" or set membership "{ ... <p> ... }".
           if ! echo "$rs" | grep -qE "tcp dport ($p\b|\{[^}]*\b${p}\b[^}]*\})[^,]*accept"; then
-            missing="$missing $p"
+            case "$p" in
+              80|443) missing_frontdoor="$missing_frontdoor $p" ;;
+              *)      missing_product="$missing_product $p" ;;
+            esac
           fi
         done
-        if [ -n "$missing" ]; then
-          echo "missing-ports:$missing"
+        # Front-door 80/443 blocked → FAIL (exit 1); only product ports
+        # blocked → WARN (exit 2).
+        if [ -n "$missing_frontdoor" ]; then
+          echo "missing-frontdoor-ports:$missing_frontdoor${missing_product:+ (also product:$missing_product)}"
           exit 1
+        fi
+        if [ -n "$missing_product" ]; then
+          echo "missing-product-ports:$missing_product (front-door 80/443 open; product ports may be proxied — advisory)"
+          exit 2
         fi
         echo "all canonical Posit ports allowed"
       expect_exit: 0
+      warn_exit: 2
       timeout_seconds: 10
